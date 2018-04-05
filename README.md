@@ -12,16 +12,16 @@ The jeromq/zeromq library can be build by following the instructions in the repo
 Clone the repository and add the installation directory to Matlab PATH for future sessions . For Example <br>
 ```
 from the matlab terminal, in windows
->>> which pathdef.m 
->>> C:\Program Files\MATLAB\R2017b\toolbox\local\pathdef.m
-Open the pathdef.m file in the location and add the directory to the list of entries. For example in windows
+>>> pathtool
+will open a window, add the directory to the list of entries and save. For example in windows
 "C:/OPENMODELICAGIT/OpenModelica/OMMatlab"
 ```
 ```
-Then we have to set the javaclasspath, so that the jeromq library can be used from matlab.
->>> which classpath.txt
-C:\Program Files\MATLAB\R2017b\toolbox\local\classpath.txt
-Then add the jar file entries to the list, for example in windows the entry would be
+Then we have to set the javaclasspath, so that the jeromq library can be used from matlab. for that we need to create a file called javaclasspath.txt and add the jar file location to the file, To do that 
+>>> prefdir
+will show the prefdirectory path, For example in windows 
+'C:\Users\arupa54\AppData\Roaming\MathWorks\MATLAB\R2017b'
+create a file javaclasspath.txt in that location and add the jar file path to the file, for example in windows the entry would be
 "C:/OPENMODELICAGIT/OpenModelica/OMMatlab/jeromq-0.4.4-SNAPSHOT.jar"
 ```
 You can also directly use the OMMatlab pacakge directly from the directory where you have cloned, without need to perform the above steps.But the package cannot be used globally.
