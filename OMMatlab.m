@@ -12,15 +12,21 @@ classdef OMMatlab < handle
                 omhome = getenv('OPENMODELICAHOME');
                 omhomepath = replace(fullfile(omhome,'bin','omc.exe'),'\','/');
                 cmd ="START /b "+omhomepath +" --interactive=zmq +z=matlab."+randomstring;
+                portfile = strcat('openmodelica.port.matlab.',randomstring);
             else
-                cmd ="omc --interactive=zmq +z=matlab."+randomstring+' &';
+                if ismac && system("which omc") ~= 0
+                  cmd ="/opt/openmodelica/bin/omc --interactive=zmq -z=matlab."+randomstring+" &";
+                else
+                  cmd ="omc --interactive=zmq -z=matlab."+randomstring+" &";
+                end
+                portfile = strcat('openmodelica.',getenv('USER'),'.port.matlab.',randomstring);
             end
             system(cmd);
             pause(0.2);
             import org.zeromq.*
             obj.context=ZMQ.context(1);
             obj.requester =obj.context.socket(ZMQ.REQ);
-            obj.portfile=replace(fullfile(tempdir,strcat('openmodelica.port.matlab.',randomstring)),'\','/');
+            obj.portfile=replace(fullfile(tempdir,portfile),'\','/');
             obj.fileid=fileread(obj.portfile);
             obj.requester.connect(obj.fileid);
         end
@@ -35,4 +41,3 @@ classdef OMMatlab < handle
         end
     end
 end
-
