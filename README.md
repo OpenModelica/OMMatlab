@@ -22,7 +22,8 @@ Then we have to set the javaclasspath, so that the jeromq library can be used fr
 will show the prefdirectory path, For example in windows 
 'C:\Users\arupa54\AppData\Roaming\MathWorks\MATLAB\R2017b'
 create a file javaclasspath.txt in that location and add the jar file path to the file, for example in windows the entry would be
-"C:/OPENMODELICAGIT/OpenModelica/OMMatlab/jeromq-0.4.4-SNAPSHOT.jar"
+C:/OPENMODELICAGIT/OpenModelica/OMMatlab/jeromq-0.4.4-SNAPSHOT.jar
+Note: The path should be added without any quotes either single or double
 ```
 You can also directly use the OMMatlab pacakge directly from the directory where you have cloned, without need to perform the above steps.But the package cannot be used globally.
 
