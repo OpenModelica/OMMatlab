@@ -42,6 +42,7 @@ classdef OMMatlab < handle
             %pause(0.2);
             obj.portfile = replace(fullfile(tempdir,portfile),'\','/');
             while true
+                pause(0.01);
                 if(isfile(obj.portfile))
                     filedata=fileread(obj.portfile);
                     break;
@@ -54,10 +55,12 @@ classdef OMMatlab < handle
             %obj.fileid=fileread(obj.portfile);
             obj.requester.connect(filedata);
         end
+        
         function reply = sendExpression(obj,expr)
             obj.requester.send(expr,0);
             reply=obj.requester.recvStr(0);
         end
+        
         function ModelicaSystem(obj,filename,modelname,libraries)
             if (nargin < 2)
                 error('Not enough arguments, filename and classname is required');
@@ -97,8 +100,21 @@ classdef OMMatlab < handle
             end
             obj.filename = filename;
             obj.modelname = modelname;
-            %BuildModelicaModel(obj)
-            buildModelResult=obj.sendExpression("buildModel("+ modelname +")");
+            BuildModelicaModel(obj)
+%             buildModelResult=obj.sendExpression("buildModel("+ modelname +")");
+%             r2=split(erase(string(buildModelResult),["{","}",""""]),",");
+%             %disp(r2);
+%             if(isempty(r2{1}))
+%                 disp(obj.sendExpression("getErrorString()"));
+%                 return;
+%             end
+%             xmlpath =strcat(pwd,'\',r2{2});
+%             obj.xmlfile = replace(xmlpath,'\','/');
+%             xmlparse(obj);
+        end
+        
+        function BuildModelicaModel(obj)
+            buildModelResult=obj.sendExpression("buildModel("+ obj.modelname +")");
             r2=split(erase(string(buildModelResult),["{","}",""""]),",");
             %disp(r2);
             if(isempty(r2{1}))
@@ -112,125 +128,81 @@ classdef OMMatlab < handle
         
         function xmlparse(obj)
             if isfile(obj.xmlfile)
-                %disp("xmlfileexist "+ obj.xmlfile)
-                %xdoc = xmlread(obj.xmlfile);
-                xdoc = xml2struct(obj.xmlfile);
-                root = xdoc(2).Children;
-                for i=1:length(root)
-                    name=root(i).Name;
-                    %disp(name)
-                    if(strcmp(name,'DefaultExperiment'))
-                        attrlist = root(i).Attributes;
-                        for attr=1: length(attrlist)
-                            name=attrlist(attr).Name;
-                            if(strcmp(name,'outputFormat')==false && strcmp(name,'variableFilter')==false)
-                                obj.simulationoptions.(name) = attrlist(attr).Value;
-                            end
-                        end
-                    end
-                    if(strcmp(name,'ModelVariables'))
-                        varlist = root(i).Children;
-                        count=1;
-                        for var=1:length(varlist)
-                            vname= varlist(var).Name;
-                            if(strcmp(vname,'ScalarVariable'))
-                                varattrlist= varlist(var).Attributes;
-                                varattrlistsubchildrens= varlist(var).Children;
-                                % add the name of variables first to struct
-                                % so that we use one loop to add all the
-                                % getmethods()
-                                for x=1: length(varattrlist)
-                                    if(strcmp(varattrlist(x).Name,'name'))
-                                        obj.quantitieslist(count).name=varattrlist(x).Value;
-                                    end
-                                end
-                                % traverse for start value
-                                tmpvalue='None';
-                                for subchild= 1:length(varattrlistsubchildrens)
-                                    subnodes= varattrlistsubchildrens(subchild).Attributes;
-                                    for s=1:length(subnodes)
-                                        sname=subnodes(s).Name;
-                                        if(strcmp(sname,'start'))
-                                            %obj.quantitieslist(count).value=subnodes(s).Value;
-                                            tmpvalue = subnodes(s).Value;
-                                        end
-                                    end
-                                end
-                                obj.quantitieslist(count).value=tmpvalue;
-                                
-                                % traverse other scalar variable attributes
-                                % like name, description, causality etc..
-                                for v=1: length(varattrlist)
-                                    scalarvarname=varattrlist(v).Name;
-                                    % disp(varattrlist(v).name)
-                                    % if(strcmp(scalarvarname,'name'))
-                                    %     obj.quantitieslist(count).(scalarvarname)=varattrlist(v).Value;
-                                    %     %tmpname=matlab.lang.makeValidName(obj.quantitieslist(count).name);
-                                    % end
-                                    if(strcmp(scalarvarname,'isValueChangeable'))
-                                        obj.quantitieslist(count).(scalarvarname)=varattrlist(v).Value;
-                                    end
-                                    if(strcmp(scalarvarname,'description'))
-                                        obj.quantitieslist(count).(scalarvarname)=varattrlist(v).Value;
-                                    end
-                                    if(strcmp(scalarvarname,'variability'))
-                                        obj.quantitieslist(count).(scalarvarname)=varattrlist(v).Value;
-                                        % check for parameters and add to parameter list
-                                        if(strcmp(varattrlist(v).Value,'parameter'))
-                                            try
-                                                obj.parameterlist.(obj.quantitieslist(count).name) = obj.quantitieslist(count).value;
-                                            catch ME
-                                                createvalidnames(obj,obj.quantitieslist(count).name,obj.quantitieslist(count).value,"parameter");
-                                            end
-                                        end
-                                        % check for continuous variable and add to continous list
-                                        if(strcmp(varattrlist(v).Value,'continuous'))
-                                            try
-                                                obj.continuouslist.(obj.quantitieslist(count).name) = obj.quantitieslist(count).value;
-                                            catch ME
-                                                createvalidnames(obj,obj.quantitieslist(count).name,obj.quantitieslist(count).value,"continuous");
-                                            end
-                                        end
-                                    end
-                                    if(strcmp(scalarvarname,'causality'))
-                                        obj.quantitieslist(count).(scalarvarname)=varattrlist(v).Value;
-                                        % check for causality input and add to input list
-                                        if(strcmp(varattrlist(v).Value,'input'))
-                                            try
-                                                obj.inputlist.(obj.quantitieslist(count).name) = obj.quantitieslist(count).value;
-                                            catch ME
-                                                createvalidnames(obj,obj.quantitieslist(count).name,obj.quantitieslist(count).value,"input");
-                                            end
-                                        end
-                                        % check for causality output and add to output list
-                                        if(strcmp(varattrlist(v).Value,'output'))
-                                            try
-                                                obj.outputlist.(obj.quantitieslist(count).name) = obj.quantitieslist(count).value;
-                                            catch ME
-                                                createvalidnames(obj,obj.quantitieslist(count).name,obj.quantitieslist(count).value,"output");
-                                            end
-                                        end
-                                    end
-                                    if(strcmp(scalarvarname,'alias'))
-                                        obj.quantitieslist(count).(scalarvarname)=varattrlist(v).Value;
-                                    end
-                                    if(strcmp(scalarvarname,'aliasvariable'))
-                                        obj.quantitieslist(count).(scalarvarname)=varattrlist(v).Value;
-                                    end
-                                end
-                                count=count+1;
-                            end
-                        end
-                    end
-                end
+                xDoc=xmlread(obj.xmlfile);
+                % DefaultExperiment %
+                allexperimentitems = xDoc.getElementsByTagName('DefaultExperiment');
+                obj.simulationoptions.('startTime') = char(allexperimentitems.item(0).getAttribute('startTime'));
+                obj.simulationoptions.('stopTime') = char(allexperimentitems.item(0).getAttribute('stopTime'));
+                obj.simulationoptions.('stepSize') = char(allexperimentitems.item(0).getAttribute('stepSize'));
+                obj.simulationoptions.('tolerance') = char(allexperimentitems.item(0).getAttribute('tolerance'));
+                obj.simulationoptions.('solver') = char(allexperimentitems.item(0).getAttribute('solver'));
                 
+                % ScalarVariables %
+                allvaritem = xDoc.getElementsByTagName('ScalarVariable');
+                for k = 0:allvaritem.getLength-1
+                    name=char(allvaritem.item(k).getAttribute('name'));
+                    changeable=char(allvaritem.item(k).getAttribute('isValueChangeable'));
+                    description=char(allvaritem.item(k).getAttribute('description'));
+                    variability=char(allvaritem.item(k).getAttribute('variability'));
+                    causality =char(allvaritem.item(k).getAttribute('causality'));
+                    alias=char(allvaritem.item(k).getAttribute('alias'));
+                    aliasVariable=char(allvaritem.item(k).getAttribute('aliasVariable'));
+                    obj.quantitieslist(k+1).('name')=name;
+                    obj.quantitieslist(k+1).('changeable')=changeable;
+                    obj.quantitieslist(k+1).('description')=description;
+                    obj.quantitieslist(k+1).('variability')=variability;
+                    obj.quantitieslist(k+1).('causality')=causality;
+                    obj.quantitieslist(k+1).('alias')=alias;
+                    obj.quantitieslist(k+1).('aliasVariable')=aliasVariable;
+                    sub = allvaritem.item(k).getElementsByTagName('Real');
+                    try
+                        value = char(sub.item(0).getAttribute('start'));
+                    catch
+                        value = '';
+                    end
+                    obj.quantitieslist(k+1).('value') = value;
+                    
+                    % check for variability parameter and add to parameter list
+                    if(strcmp(variability,'parameter'))
+                        try
+                            obj.parameterlist.(name) = value;
+                        catch ME
+                            createvalidnames(obj,name,value,"parameter");
+                        end
+                    end
+                    % check for variability continuous and add to continuous list
+                    if(strcmp(variability,'continuous'))
+                        try
+                            obj.continuouslist.(name) = value;
+                        catch ME
+                            createvalidnames(obj,name,value,"continuous");
+                        end
+                    end
+                    
+                    % check for causality input and add to input list
+                    if(strcmp(causality,'input'))
+                        try
+                            obj.inputlist.(name) = value;
+                        catch ME
+                            createvalidnames(obj,name,value,"input");
+                        end
+                    end
+                    % check for causality output and add to output list
+                    if(strcmp(causality,'output'))
+                        try
+                            obj.outputlist.(name) = value;
+                        catch ME
+                            createvalidnames(obj,name,value,"output");
+                        end
+                    end                   
+                end
             else
                 msg="xmlfile is not generated";
                 error(msg);
                 return;
-            end
+            end            
         end
-        
+                
         function result= getQuantities(obj,args)
             if exist('args', 'var')
                 tmpresult=[];
@@ -317,7 +289,7 @@ classdef OMMatlab < handle
             if(isfile(obj.xmlfile))
                 if (ispc)
                     getexefile = replace(fullfile(pwd,[char(obj.modelname),'.exe']),'\','/');
-                    disp(getexefile)
+                    %disp(getexefile)
                 else
                     getexefile = replace(fullfile(pwd,char(obj.modelname)),'\','/');
                 end
