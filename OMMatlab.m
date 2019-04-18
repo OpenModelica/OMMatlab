@@ -1,5 +1,5 @@
 classdef OMMatlab < handle
-    properties
+    properties (Access = private)
         context
         requester
         portfile
@@ -14,6 +14,7 @@ classdef OMMatlab < handle
         inputlist=struct
         outputlist=struct
         mappednames=struct
+        overridevariables=struct
         %fileid
     end
     methods
@@ -101,16 +102,16 @@ classdef OMMatlab < handle
             obj.filename = filename;
             obj.modelname = modelname;
             BuildModelicaModel(obj)
-%             buildModelResult=obj.sendExpression("buildModel("+ modelname +")");
-%             r2=split(erase(string(buildModelResult),["{","}",""""]),",");
-%             %disp(r2);
-%             if(isempty(r2{1}))
-%                 disp(obj.sendExpression("getErrorString()"));
-%                 return;
-%             end
-%             xmlpath =strcat(pwd,'\',r2{2});
-%             obj.xmlfile = replace(xmlpath,'\','/');
-%             xmlparse(obj);
+            %             buildModelResult=obj.sendExpression("buildModel("+ modelname +")");
+            %             r2=split(erase(string(buildModelResult),["{","}",""""]),",");
+            %             %disp(r2);
+            %             if(isempty(r2{1}))
+            %                 disp(obj.sendExpression("getErrorString()"));
+            %                 return;
+            %             end
+            %             xmlpath =strcat(pwd,'\',r2{2});
+            %             obj.xmlfile = replace(xmlpath,'\','/');
+            %             xmlparse(obj);
         end
         
         function BuildModelicaModel(obj)
@@ -194,15 +195,15 @@ classdef OMMatlab < handle
                         catch ME
                             createvalidnames(obj,name,value,"output");
                         end
-                    end                   
+                    end
                 end
             else
                 msg="xmlfile is not generated";
                 error(msg);
                 return;
-            end            
+            end
         end
-                
+        
         function result= getQuantities(obj,args)
             if exist('args', 'var')
                 tmpresult=[];
@@ -285,6 +286,37 @@ classdef OMMatlab < handle
             return;
         end
         
+        % Set Methods
+        function setParameters(obj,args)
+            if exist('args', 'var')
+                for n=1:length(args)
+                    value=split(args(n),"=");
+                    if(isfield(obj.parameterlist,char(value(1))))
+                        obj.parameterlist.(value(1))= value(2);
+                        obj.overridevariables.(value(1))= value(2);
+                    else
+                        disp(value(1) + " is not a parameter");
+                        return;
+                    end
+                end
+            end
+        end
+        
+        function setSimulationOptions(obj,args)
+            if exist('args', 'var')
+                for n=1:length(args)
+                    value=split(args(n),"=");
+                    if(isfield(obj.simulationoptions,char(value(1))))
+                        obj.simulationoptions.(value(1))= value(2);
+                        obj.overridevariables.(value(1))= value(2);
+                    else
+                        disp(value(1) + " is not a Simulation Option");
+                        return;
+                    end
+                end
+            end
+        end
+        
         function simulate(obj)
             if(isfile(obj.xmlfile))
                 if (ispc)
@@ -293,7 +325,16 @@ classdef OMMatlab < handle
                 else
                     getexefile = replace(fullfile(pwd,char(obj.modelname)),'\','/');
                 end
-                system(getexefile);
+                fields=fieldnames(obj.overridevariables);
+                tmpoverride1=strings(1,length(fields));
+                for i=1:length(fields)
+                    tmpoverride1(i)=fields(i)+"="+obj.overridevariables.(fields{i});
+                end
+                tmpoverride2=[' -override=',char(strjoin(tmpoverride1,','))];
+                %disp(tmpoverride2);
+                finalsimulationexe = [getexefile,tmpoverride2];
+                %disp(finalsimulationexe);
+                system(finalsimulationexe);
                 obj.resultfile=replace(fullfile(pwd,[char(obj.modelname),'_res.mat']),'\','/');
             else
                 disp("Model cannot be Simulated:")
@@ -353,7 +394,6 @@ classdef OMMatlab < handle
                 obj.outputlist.(tmpname)= value;
             end
         end
-        
         
         function delete(obj)
             delete(obj.portfile);
