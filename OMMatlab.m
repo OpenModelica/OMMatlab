@@ -1,5 +1,6 @@
 classdef OMMatlab < handle
     properties (Access = private)
+        process
         context
         requester
         portfile
@@ -7,6 +8,8 @@ classdef OMMatlab < handle
         modelname
         xmlfile
         resultfile=''
+        csvfile=''
+        mattempdir=''
         simulationoptions=struct
         quantitieslist=struct
         parameterlist=struct
@@ -15,11 +18,16 @@ classdef OMMatlab < handle
         outputlist=struct
         mappednames=struct
         overridevariables=struct
+        inputflag=false
         %fileid
     end
     methods
         function obj = OMMatlab()
             randomstring = char(97 + floor(26 .* rand(10,1)))';
+            startInfo = System.Diagnostics.ProcessStartInfo();
+            startInfo.Arguments=['--interactive=zmq +z=matlab.',randomstring];
+            startInfo.UseShellExecute=false;
+            startInfo.CreateNoWindow=true;
             if ispc
                 omhome = getenv('OPENMODELICAHOME');
                 omhomepath = replace(fullfile(omhome,'bin','omc.exe'),'\','/');
@@ -27,19 +35,23 @@ classdef OMMatlab < handle
                 path1 = getenv('PATH');
                 path1 = [path1 omhome];
                 setenv('PATH', path1);
-                
                 %cmd ="START /b "+omhomepath +" --interactive=zmq +z=matlab."+randomstring;
-                cmd = ['START /b',' ',omhomepath,' --interactive=zmq +z=matlab.',randomstring];
+                %cmd = ['START /b',' ',omhomepath,' --interactive=zmq +z=matlab.',randomstring];
+                startInfo.FileName=omhomepath;
                 portfile = strcat('openmodelica.port.matlab.',randomstring);
             else
                 if ismac && system("which omc") ~= 0
-                    cmd =['/opt/openmodelica/bin/omc --interactive=zmq -z=matlab.',randomstring,' &'];
+                    %cmd =['/opt/openmodelica/bin/omc --interactive=zmq -z=matlab.',randomstring,' &'];
+                    startInfo.FileName='/opt/openmodelica/bin/omc';
                 else
-                    cmd =['omc --interactive=zmq -z=matlab.',randomstring,' &'];
+                    %cmd =['omc --interactive=zmq -z=matlab.',randomstring,' &'];
+                    startInfo.FileName='omc';
                 end
                 portfile = strcat('openmodelica.',getenv('USER'),'.port.matlab.',randomstring);
             end
-            system(cmd);
+            %system(cmd);
+            obj.process = System.Diagnostics.Process.Start(startInfo);
+            %disp(obj.process.Id)
             %pause(0.2);
             obj.portfile = replace(fullfile(tempdir,portfile),'\','/');
             while true
@@ -101,6 +113,11 @@ classdef OMMatlab < handle
             end
             obj.filename = filename;
             obj.modelname = modelname;
+            tmpdirname = char(97 + floor(26 .* rand(15,1)))';
+            obj.mattempdir = replace(fullfile(tempdir,tmpdirname),'\','/');
+%             disp("tempdir" + obj.mattempdir)
+            mkdir(obj.mattempdir);
+            obj.sendExpression("cd("""+ obj.mattempdir +""")")
             BuildModelicaModel(obj)
             %             buildModelResult=obj.sendExpression("buildModel("+ modelname +")");
             %             r2=split(erase(string(buildModelResult),["{","}",""""]),",");
@@ -122,7 +139,7 @@ classdef OMMatlab < handle
                 disp(obj.sendExpression("getErrorString()"));
                 return;
             end
-            xmlpath =strcat(pwd,'\',r2{2});
+            xmlpath =strcat(obj.mattempdir,'\',r2{2});
             obj.xmlfile = replace(xmlpath,'\','/');
             xmlparse(obj);
         end
@@ -290,7 +307,8 @@ classdef OMMatlab < handle
         function setParameters(obj,args)
             if exist('args', 'var')
                 for n=1:length(args)
-                    value=split(args(n),"=");
+                    val=replace(args(n)," ","");
+                    value=split(val,"=");
                     if(isfield(obj.parameterlist,char(value(1))))
                         obj.parameterlist.(value(1))= value(2);
                         obj.overridevariables.(value(1))= value(2);
@@ -305,7 +323,8 @@ classdef OMMatlab < handle
         function setSimulationOptions(obj,args)
             if exist('args', 'var')
                 for n=1:length(args)
-                    value=split(args(n),"=");
+                    val=replace(args(n)," ","");
+                    value=split(val,"=");
                     if(isfield(obj.simulationoptions,char(value(1))))
                         obj.simulationoptions.(value(1))= value(2);
                         obj.overridevariables.(value(1))= value(2);
@@ -317,28 +336,155 @@ classdef OMMatlab < handle
             end
         end
         
+        function setInputs(obj,args)
+            if exist('args', 'var')
+                for n=1:length(args)
+                    val=replace(args(n)," ","");
+                    value=split(val,"=");
+                    if(isfield(obj.inputlist,char(value(1))))
+                        obj.inputlist.(value(1))= value(2);
+                        obj.inputflag=true;
+                    else
+                        disp(value(1) + " is not a Input");
+                        return;
+                    end
+                end
+            end
+        end
+        
+        function createcsvData(obj)
+            obj.csvfile = replace(fullfile(obj.mattempdir,[char(obj.modelname),'.csv']),'\','/');
+            fileID = fopen(obj.csvfile,"w");
+            %disp(strjoin(fieldnames(obj.inputlist),","));
+            fprintf(fileID,['time,',strjoin(fieldnames(obj.inputlist),","),',end\n']);
+            %csvdata = obj.inputlist;
+            fields=fieldnames(obj.inputlist);
+            %time=strings(1,length(csvdata));
+            time=[];
+            count=1;
+            tmpcsvdata=struct;
+            for i=1:length(fieldnames(obj.inputlist))
+                %disp(fields(i));
+                %disp(obj.inputlist.(fields{i}));
+                %disp("loop"+ num2str(i))
+                %disp(fields{i})
+                var = obj.inputlist.(fields{i});
+                if(isempty(var))
+                    var="0";
+                end 
+                s1 = eval(replace(replace(replace(replace(var,"[","{"),"]","}"),"(","{"),")","}"));
+                tmpcsvdata.(char(fields(i))) = s1;
+                %csvdata.()=s1;
+                %disp(length(s1));
+                if(length(s1)>1)
+                    for j=1:length(s1)
+                        t = s1(j);
+                        %disp(t{1}{1});
+                        %time(count)=t{1}{1};
+                        time=[time,t{1}{1}];
+                        count=count+1;
+                    end
+                end                
+            end
+            %disp(tmpcsvdata)
+            %disp(length(time))  
+            if(isempty(time))
+                time=[time,obj.simulationoptions.('startTime')];
+                time=[time,obj.simulationoptions.('stopTime')];
+            end
+            %disp(time)
+            %disp(sort(time))
+            
+            t1=struct2cell(tmpcsvdata);
+            %disp(length(t1))
+            sortedtime=sort(time);
+            previousvalue=struct;
+            for t=1:length(sortedtime)
+                fprintf(fileID,[num2str(sortedtime(t)),',']);
+                listcount=1;
+                for i=1:length(t1)
+                    tmp1=t1{i};
+                    if(iscell(tmp1))
+                        %disp("length is :" + length(tmp1))
+                        found=false;
+                        for k=1:length(tmp1)
+                            if(sortedtime(t)==tmp1{k}{1})
+                                %disp(sortedtime(t)+ "=>" + tmp1{k}{1})
+                                data=tmp1{k}{2};
+%                                 disp(sortedtime(t)+ "=>" + data)
+                                fprintf(fileID,[num2str(data),',']);
+                                %pfieldname=matlab.lang.makeValidName(string(listcount));
+                                pfieldname="x"+string(listcount);
+                                previousvalue.(pfieldname)=data;
+                                tmp1(k)=[];
+                                t1{i}=tmp1;
+                                found=true;
+                                break;
+                            end
+                        end
+                        if(found==false)
+                            %disp(previousvalue)
+                            %disp(string(listcount))
+                            tmpfieldname="x"+string(listcount);
+%                             disp("false loop" + previousvalue.(tmpfieldname))
+                            data=previousvalue.(tmpfieldname);
+                            fprintf(fileID,[num2str(data),',']);
+                        end
+                    else
+%                         disp("strings found" + t1{i})
+%                         disp(class(t1{i}))
+%                         fprintf(fileID,'%s',t1{i},',');
+                        fprintf(fileID,[num2str(t1{i}),',']);
+                    end
+                    listcount=listcount+1;
+                end
+                fprintf(fileID,[num2str(0),'\n']);
+%                 disp(sortedtime(t) + "****************************")
+            end           
+            fclose(fileID);
+        end
+        
         function simulate(obj)
             if(isfile(obj.xmlfile))
                 if (ispc)
-                    getexefile = replace(fullfile(pwd,[char(obj.modelname),'.exe']),'\','/');
+                    getexefile = replace(fullfile(obj.mattempdir,[char(obj.modelname),'.exe']),'\','/');
                     %disp(getexefile)
                 else
-                    getexefile = replace(fullfile(pwd,char(obj.modelname)),'\','/');
+                    getexefile = replace(fullfile(obj.mattempdir,char(obj.modelname)),'\','/');
                 end
-                fields=fieldnames(obj.overridevariables);
-                tmpoverride1=strings(1,length(fields));
-                for i=1:length(fields)
-                    tmpoverride1(i)=fields(i)+"="+obj.overridevariables.(fields{i});
+                curdir=pwd;
+                if(isfile(getexefile))
+                    cd(obj.mattempdir)
+                    fields=fieldnames(obj.overridevariables);
+                    tmpoverride1=strings(1,length(fields));
+                    for i=1:length(fields)
+                        tmpoverride1(i)=fields(i)+"="+obj.overridevariables.(fields{i});
+                    end
+                    tmpoverride2=[' -override=',char(strjoin(tmpoverride1,','))];
+                    %disp(tmpoverride2);
+                    if(obj.inputflag==true)
+                        obj.createcsvData()
+                        %disp("inputflag")
+                        %disp(obj.csvfile)
+                        csvinput=join([' -csvInput=',obj.csvfile]);
+                        %disp(csvinput)
+                        finalsimulationexe = [getexefile,tmpoverride2,csvinput];
+                    else
+                        finalsimulationexe = [getexefile,tmpoverride2];
+                    end
+                    %finalsimulationexe = [getexefile,tmpoverride2,csvinput];
+                    %disp(finalsimulationexe);
+                    system(finalsimulationexe);
+                    obj.resultfile=replace(fullfile(obj.mattempdir,[char(obj.modelname),'_res.mat']),'\','/');
+                else
+                    disp("Model cannot be Simulated: executable not found")
                 end
-                tmpoverride2=[' -override=',char(strjoin(tmpoverride1,','))];
-                %disp(tmpoverride2);
-                finalsimulationexe = [getexefile,tmpoverride2];
-                %disp(finalsimulationexe);
-                system(finalsimulationexe);
-                obj.resultfile=replace(fullfile(pwd,[char(obj.modelname),'_res.mat']),'\','/');
+                cd(curdir)
+                %disp(pwd)
             else
-                disp("Model cannot be Simulated:")
-            end
+                disp("Model cannot be Simulated: xmlfile not found")
+            end 
+            
         end
         
         function result = getSolutions(obj,args)
@@ -396,9 +542,12 @@ classdef OMMatlab < handle
         end
         
         function delete(obj)
+            %disp("inside delete")
             delete(obj.portfile);
             obj.requester.close();
             delete(obj);
+            % kill the spwaned process for omc
+            obj.process.Kill()
         end
     end
 end
