@@ -32,12 +32,13 @@ classdef OMMatlab < handle
                 omhome = getenv('OPENMODELICAHOME');
                 omhomepath = replace(fullfile(omhome,'bin','omc.exe'),'\','/');
                 % add omhome to path environment variabel
-                path1 = getenv('PATH');
-                path1 = [path1 omhome];
-                setenv('PATH', path1);
+%                 path1 = getenv('PATH');
+%                 path1 = [path1 omhome];
+%                 setenv('PATH', path1);
                 %cmd ="START /b "+omhomepath +" --interactive=zmq +z=matlab."+randomstring;
                 %cmd = ['START /b',' ',omhomepath,' --interactive=zmq +z=matlab.',randomstring];
                 startInfo.FileName=omhomepath;
+                startInfo.Environment.Add('OPENMODELICAHOME',omhome);
                 portfile = strcat('openmodelica.port.matlab.',randomstring);
             else
                 if ismac && system("which omc") ~= 0
@@ -69,9 +70,13 @@ classdef OMMatlab < handle
             obj.requester.connect(filedata);
         end
         
+        
         function reply = sendExpression(obj,expr)
             obj.requester.send(expr,0);
-            reply=obj.requester.recvStr(0);
+            data=obj.requester.recvStr(0);
+            % Parse java string object and return in appropriate matlab
+            % structure if possible, otherwise return as normal strings
+            reply=parseExpression(obj,string(data));
         end
         
         function ModelicaSystem(obj,filename,modelname,libraries)
@@ -87,8 +92,7 @@ classdef OMMatlab < handle
             filepath = replace(filename,'\','/');
             %disp(filepath);
             loadfilemsg=obj.sendExpression("loadFile( """+ filepath +""")");
-            %disp(loadfilemsg);
-            if (eval(loadfilemsg)==false)
+            if (loadfilemsg=="false")
                 disp(obj.sendExpression("getErrorString()"));
                 return;
             end
@@ -103,7 +107,7 @@ classdef OMMatlab < handle
                         libmsg = obj.sendExpression("loadModel("+ libraries{n} +")");
                     end
                     %disp(libmsg);
-                    if (eval(libmsg)==false)
+                    if (libmsg=="false")
                         disp(obj.sendExpression("getErrorString()"));
                         return;
                     end
@@ -133,13 +137,14 @@ classdef OMMatlab < handle
         
         function BuildModelicaModel(obj)
             buildModelResult=obj.sendExpression("buildModel("+ obj.modelname +")");
-            r2=split(erase(string(buildModelResult),["{","}",""""]),",");
+            %r2=split(erase(string(buildModelResult),["{","}",""""]),",");
             %disp(r2);
-            if(isempty(r2{1}))
+            if(isempty(buildModelResult(1)))
                 disp(obj.sendExpression("getErrorString()"));
                 return;
             end
-            xmlpath =strcat(obj.mattempdir,'\',r2{2});
+            %xmlpath =strcat(obj.mattempdir,'\',r2{2});
+            xmlpath=fullfile(obj.mattempdir,char(buildModelResult(2)));
             obj.xmlfile = replace(xmlpath,'\','/');
             xmlparse(obj);
         end
@@ -494,23 +499,25 @@ classdef OMMatlab < handle
                     tmp2=['{',tmp1,'}'];
                     %disp(tmp2)
                     simresult=obj.sendExpression("readSimulationResult(""" + obj.resultfile + ""","+tmp2+")");
-                    data=eval(simresult);
+                    %data=eval(simresult);
                     %disp("size is:" +length(data));
                     % create an empty cell array of fixed length
-                    finalresults={length(data)};
-                    for n=1:length(data)
-                        %disp("loop val:" + n);
-                        finalresults{n} = cell2mat(data{1,n});
-                    end
-                    result = finalresults;
+%                     finalresults={length(simresult)};
+%                     for n=1:length(simresult)
+%                         %disp("loop val:" + n);
+%                         finalresults{n} = cell2mat(simresult{1,n});
+%                     end
+%                     result = finalresults;
+                    result=simresult;
                 else
                     tmp1=obj.sendExpression("readSimulationResultVars(""" + obj.resultfile + """)");
-                    tmp2=eval(tmp1);
-                    tmp3=strings(1,length(tmp2));
-                    for i=1:length(tmp2)
-                        tmp3(i)=tmp2{i};
-                    end
-                    result = tmp3;
+%                     disp(tmp1);
+%                     tmp2=eval(tmp1);
+%                     tmp3=strings(1,length(tmp2));
+%                     for i=1:length(tmp2)
+%                         tmp3(i)=tmp2{i};
+%                     end
+                    result = tmp1();
                 end
                 return;
             else
@@ -540,7 +547,68 @@ classdef OMMatlab < handle
                 obj.outputlist.(tmpname)= value;
             end
         end
-        
+      
+        function result = parseExpression(~,args)
+            %final=regexp(args,'(?<=")[^"]+(?=")|[{}(),]|[a-zA-Z0-9.]+','match');
+            final=regexp(args,'"(.*?)"|[{}()=]|[a-zA-Z0-9.]+','match');
+            %final=regexp(args,'"([^"]|\n)*"|[{}()=]|[a-zA-Z0-9.]+','match');
+            if(length(final)>1)
+                if(final(1)=="{" && final(2)~="{")
+                    tmp3=strings(1,1);
+                    count=1;
+                    for i=1:length(final)
+                        if(final(i)~="{" && final(i)~="}" && final(i)~="(" && final(i)~=")" && final(i)~=",")
+                            value=replace(final{i},"""","");
+                            tmp3(count)=value;
+                            count=count+1;
+                        end
+                    end
+                    result=tmp3;
+                elseif(final(1)=="{" && final(2)=="{")
+                    %result=eval(args);
+                    tmpresults={1};
+                    tmpcount=1;
+                    count=1;
+                    for i=2:length(final)-1
+                        if(final(i)=="{")
+                            if(isnan(str2double(final(i+1))))
+                                tmp=strings(1,1);
+                            else
+                                tmp=[];
+                            end
+                        elseif(final(i)=="}")
+                            tmpresults{tmpcount}=tmp;
+                            tmp=[];
+                            count=1;
+                            tmpcount=tmpcount+1;
+                        else
+                            tmp(count)=final(i);
+                            count=count+1;
+                        end
+                    end
+                    result=tmpresults;
+                elseif(final(1)=="record")
+                    result=struct;
+                    for i=3:length(final)-2
+                        if(final(i)=="=")
+                            value=replace(final(i+1),"""","");
+                            result.(final(i-1))= value;
+                        end
+                    end                    
+                else
+                    %reply=final;
+                    disp("returning unparsed string")
+                    result=replace(args,"""","");
+                    %result=args;
+                end
+            elseif(length(final)==1)
+                  result=replace(final,"""","");
+            else
+                disp("returning unparsed string")
+                result=replace(args,"""","");
+            end
+        end
+
         function delete(obj)
             %disp("inside delete")
             delete(obj.portfile);
