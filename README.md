@@ -6,10 +6,10 @@ Matlab scripting OpenModelica interface using ZEROMQ
 [Matlab](https://se.mathworks.com/products/matlab.html)<br>
 [zeromq/jeromq](https://github.com/zeromq/jeromq)<br>
 
-The jeromq/zeromq library can be build by following the instructions in the repository, or the users can use the pre build "jeromq-0.4.4-SNAPSHOT.jar" available in this repository and start using it straight away.
+The jeromq/zeromq library can be build by following the instructions in the repository, or the users can use the pre-build "jeromq-0.4.4-SNAPSHOT.jar" available in this repository and start using it straight away.
 
 # Installation
-Clone the repository and add the installation directory to Matlab PATH for future sessions . For Example <br>
+Clone the repository and add the installation directory to Matlab PATH for future sessions. For Example <br>
 ```
 from the matlab terminal, in windows
 >>> pathtool
@@ -17,15 +17,15 @@ will open a window, add the directory to the list of entries and save. For examp
 "C:/OPENMODELICAGIT/OpenModelica/OMMatlab"
 ```
 ```
-Then we have to set the javaclasspath, so that the jeromq library can be used from matlab. for that we need to create a file called javaclasspath.txt and add the jar file location to the file, To do that 
+Then we have to set the java classpath, so that the jeromq library can be used from Matlab. for that we need to create a file called javaclasspath.txt and add the jar file location to the file, To do that 
 >>> prefdir
-will show the prefdirectory path, For example in windows 
+will show the preferred directory path, For example in windows 
 'C:\Users\arupa54\AppData\Roaming\MathWorks\MATLAB\R2017b'
 create a file javaclasspath.txt in that location and add the jar file path to the file, for example in windows the entry would be
 C:/OPENMODELICAGIT/OpenModelica/OMMatlab/jeromq-0.4.4-SNAPSHOT.jar
 Note: The path should be added without any quotes either single or double
 ```
-You can also directly use the OMMatlab pacakge directly from the directory where you have cloned, without need to perform the above steps.But the package cannot be used globally.
+You can also directly use the OMMatlab package directly from the directory where you have cloned, without need to perform the above steps. But the package cannot be used globally.
 
 # Usage
 ```
