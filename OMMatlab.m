@@ -47,7 +47,7 @@ classdef OMMatlab < handle
         inputflag=false
         linearOptions=struct('startTime','0.0','stopTime','1.0','numberOfIntervals','500','stepSize','0.002','tolerance','1e-6')
         linearfile
-        linearFlag
+        linearFlag=false
         linearmodelname
         linearinputs
         linearoutputs
@@ -234,6 +234,19 @@ classdef OMMatlab < handle
                         value = '';
                     end
                     obj.quantitieslist(k+1).('value') = value;
+                    if(obj.linearFlag==true)
+                        if(alias=="alias")
+                            if (name(2) == 'x')
+                                obj.linearstates=[obj.linearstates,name(4:end-1)];
+                            end
+                            if (name(2) == 'u')
+                                obj.linearinputs=[obj.linearinputs,name(4:end-1)];
+                            end
+                            if (name(2) == 'y')
+                                obj.linearoutputs=[obj.linearoutputs,name(4:end-1)];
+                            end
+                        end
+                     end
                     
                     % check for variability parameter and add to parameter list
                     if(strcmp(variability,'parameter'))
@@ -586,14 +599,11 @@ classdef OMMatlab < handle
             for i=1:length(fields)
                 tmpoverride1(i)=fields(i)+"="+obj.overridevariables.(fields{i});
             end
-            %disp("roger")
-            %disp(length(tmpoverride1));
             if(~isempty(tmpoverride1))
                 tmpoverride2=[' -override=',char(strjoin(tmpoverride1,','))];
             else
                 tmpoverride2="";
             end
-            %tmpoverride2=[' -override=',char(strjoin(tmpoverride1,','))];
                        
             linfields=fieldnames(obj.linearOptions);
             tmpoverride1lin=strings(1,length(linfields));
@@ -601,7 +611,7 @@ classdef OMMatlab < handle
                 tmpoverride1lin(i)=linfields(i)+"="+obj.linearOptions.(linfields{i});
             end
             overridelinear=char(strjoin(tmpoverride1lin,','));
-            %disp(overridelinear)
+            
             if(obj.inputflag==true)
                 obj.createcsvData()                
                 csvinput=join(['-csvInput=',obj.csvfile]);
@@ -623,8 +633,46 @@ classdef OMMatlab < handle
                 cNames =obj.sendExpression("getClassNames()");
                 buildmodelexpr=join(["buildModel(",cNames(1),")"]);
                 buildModelmsg=obj.sendExpression(buildmodelexpr);
-%                 disp(buildModelmsg(:))
+                %disp(buildModelmsg(:))
+                if(~isempty(buildModelmsg(1)))
+                    obj.linearFlag=true;
+                    obj.xmlfile=replace(fullfile(obj.mattempdir,char(buildModelmsg(2))),'\','/');
+                    obj.linearquantitylist
+                    obj.linearinputs=strings(0,0);
+                    obj.linearoutputs=strings(0,0);
+                    obj.linearstates=strings(0,0);
+                    xmlparse(obj)
+                else
+                    disp(omc.sendExpression("getErrorString()"));
+                end
             end
+        end
+        
+        function result = getLinearInputs(obj)
+            if(obj.linearFlag==true)
+                result=obj.linearinputs;
+            else
+                disp("Model is not Linearized");
+            end
+            return;
+        end
+        
+        function result = getLinearOutputs(obj)
+            if(obj.linearFlag==true)
+                result=obj.linearoutputs;
+            else
+                disp("Model is not Linearized");
+            end
+            return;
+        end
+        
+        function result = getLinearStates(obj)
+            if(obj.linearFlag==true)
+                result=obj.linearstates;
+            else
+                disp("Model is not Linearized");
+            end
+            return;
         end
         
         function result = getSolutions(obj,args)
