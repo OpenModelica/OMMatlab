@@ -1,3 +1,29 @@
+% This file is part of OpenModelica.
+% Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
+% c/o Linköpings universitet, Department of Computer and Information Science,
+% SE-58183 Linköping, Sweden.
+% 
+% All rights reserved.
+% 
+% THIS PROGRAM IS PROVIDED UNDER THE TERMS OF THE BSD NEW LICENSE OR THE
+% GPL VERSION 3 LICENSE OR THE OSMC PUBLIC LICENSE (OSMC-PL) VERSION 1.2.
+% ANY USE, REPRODUCTION OR DISTRIBUTION OF THIS PROGRAM CONSTITUTES
+% RECIPIENT'S ACCEPTANCE OF THE OSMC PUBLIC LICENSE OR THE GPL VERSION 3,
+% ACCORDING TO RECIPIENTS CHOICE.
+% 
+% The OpenModelica software and the OSMC (Open Source Modelica Consortium)
+% Public License (OSMC-PL) are obtained from OSMC, either from the above
+% address, from the URLs: http://www.openmodelica.org or
+% http://www.ida.liu.se/projects/OpenModelica, and in the OpenModelica
+% distribution. GNU version 3 is obtained from:
+% http://www.gnu.org/copyleft/gpl.html. The New BSD License is obtained from:
+% http://www.opensource.org/licenses/BSD-3-Clause.
+% 
+% This program is distributed WITHOUT ANY WARRANTY; without even the implied
+% warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE, EXCEPT AS
+% EXPRESSLY SET FORTH IN THE BY RECIPIENT SELECTED SUBSIDIARY LICENSE
+% CONDITIONS OF OSMC-PL.
+
 classdef OMMatlab < handle
     properties (Access = private)
         process
@@ -18,35 +44,51 @@ classdef OMMatlab < handle
         outputlist=struct
         mappednames=struct
         overridevariables=struct
+        linearOptions=struct('startTime','0.0','stopTime','1.0','numberOfIntervals','500','stepSize','0.002','tolerance','1e-6')
         inputflag=false
         %fileid
     end
     methods
-        function obj = OMMatlab()
-            randomstring = char(97 + floor(26 .* rand(10,1)))';
+        function obj = OMMatlab(omcpath)
+            %randomstring = char(97 + floor(26 .* rand(10,1)))';
+            [~,randomstring]=fileparts(tempname);
             startInfo = System.Diagnostics.ProcessStartInfo();
             startInfo.Arguments=['--interactive=zmq +z=matlab.',randomstring];
             startInfo.UseShellExecute=false;
             startInfo.CreateNoWindow=true;
             if ispc
-                omhome = getenv('OPENMODELICAHOME');
-                omhomepath = replace(fullfile(omhome,'bin','omc.exe'),'\','/');
-                % add omhome to path environment variabel
-%                 path1 = getenv('PATH');
-%                 path1 = [path1 omhome];
-%                 setenv('PATH', path1);
-                %cmd ="START /b "+omhomepath +" --interactive=zmq +z=matlab."+randomstring;
-                %cmd = ['START /b',' ',omhomepath,' --interactive=zmq +z=matlab.',randomstring];
-                startInfo.FileName=omhomepath;
-                startInfo.Environment.Add('OPENMODELICAHOME',omhome);
+                if ~exist('omcpath', 'var')
+                    omhome = getenv('OPENMODELICAHOME');
+                    omhomepath = replace(fullfile(omhome,'bin','omc.exe'),'\','/');
+                    % add omhome to path environment variabel
+                    %                 path1 = getenv('PATH');
+                    %                 path1 = [path1 omhome];
+                    %                 setenv('PATH', path1);
+                    %cmd ="START /b "+omhomepath +" --interactive=zmq +z=matlab."+randomstring;
+                    %cmd = ['START /b',' ',omhomepath,' --interactive=zmq +z=matlab.',randomstring];
+                    startInfo.FileName=omhomepath;
+                    startInfo.Environment.Add('OPENMODELICAHOME',omhome);
+                else
+                    [dirname1,~]=fileparts(fileparts(omcpath));
+                    startInfo.FileName=omcpath;
+                    startInfo.Environment.Add('OPENMODELICAHOME',dirname1);
+                end
                 portfile = strcat('openmodelica.port.matlab.',randomstring);
             else
                 if ismac && system("which omc") ~= 0
                     %cmd =['/opt/openmodelica/bin/omc --interactive=zmq -z=matlab.',randomstring,' &'];
-                    startInfo.FileName='/opt/openmodelica/bin/omc';
+                    if ~exist('omcpath', 'var')
+                        startInfo.FileName='/opt/openmodelica/bin/omc';
+                    else
+                        startInfo.FileName=omcpath;
+                    end
                 else
                     %cmd =['omc --interactive=zmq -z=matlab.',randomstring,' &'];
-                    startInfo.FileName='omc';
+                    if ~exist('omcpath', 'var')
+                        startInfo.FileName='omc';
+                    else
+                        startInfo.FileName=omcpath;
+                    end
                 end
                 portfile = strcat('openmodelica.',getenv('USER'),'.port.matlab.',randomstring);
             end
@@ -117,9 +159,10 @@ classdef OMMatlab < handle
             end
             obj.filename = filename;
             obj.modelname = modelname;
-            tmpdirname = char(97 + floor(26 .* rand(15,1)))';
-            obj.mattempdir = replace(fullfile(tempdir,tmpdirname),'\','/');
-%             disp("tempdir" + obj.mattempdir)
+            %tmpdirname = char(97 + floor(26 .* rand(15,1)))';
+            
+            obj.mattempdir = replace(tempname,'\','/');
+            %disp("tempdir" + obj.mattempdir)
             mkdir(obj.mattempdir);
             obj.sendExpression("cd("""+ obj.mattempdir +""")")
             BuildModelicaModel(obj)
@@ -308,6 +351,19 @@ classdef OMMatlab < handle
             return;
         end
         
+        function result = getLinearizationOptions(obj,args)
+            if exist('args', 'var')
+                linoptions=strings(1,length(args));
+                for n=1:length(args)
+                    linoptions(n) = obj.linearOptions.(args(n));
+                end
+                result = linoptions;
+            else
+                result = obj.linearOptions;
+            end
+            return;
+        end
+        
         % Set Methods
         function setParameters(obj,args)
             if exist('args', 'var')
@@ -335,6 +391,22 @@ classdef OMMatlab < handle
                         obj.overridevariables.(value(1))= value(2);
                     else
                         disp(value(1) + " is not a Simulation Option");
+                        return;
+                    end
+                end
+            end
+        end
+        
+        function setLinearizationOptions(obj,args)
+            if exist('args', 'var')
+                for n=1:length(args)
+                    val=replace(args(n)," ","");
+                    value=split(val,"=");
+                    if(isfield(obj.linearOptions,char(value(1))))
+                        obj.linearOptions.(value(1))= value(2);
+                        obj.linearOptions.(value(1))= value(2);
+                    else
+                        disp(value(1) + " is not a Linearization Option");
                         return;
                     end
                 end
@@ -490,6 +562,50 @@ classdef OMMatlab < handle
                 disp("Model cannot be Simulated: xmlfile not found")
             end 
             
+        end
+        
+        function linearize(obj)
+            linres=obj.sendExpression("setCommandLineOptions(""+generateSymbolicLinearization"")");
+            %disp(linres);
+            %disp(obj.modelname);
+            if(linres=="false")
+                disp("Linearization cannot be performed"+obj.sendExpression("getErrorString()"));
+                return;
+            end
+            %linearize(SeborgCSTR.ModSeborgCSTRorg,startTime=0.0,stopTime=1.0,numberOfIntervals=500,stepSize=0.002,tolerance=1e-6,simflags="-csvInput=C:/Users/arupa54/AppData/Local/Temp/jl_59DA.tmp/SeborgCSTR.ModSeborgCSTRorg.csv -override=a=2.0")
+            
+            fields=fieldnames(obj.overridevariables);
+            tmpoverride1=strings(1,length(fields));
+            for i=1:length(fields)
+                tmpoverride1(i)=fields(i)+"="+obj.overridevariables.(fields{i});
+            end
+            %disp("roger")
+            %disp(length(tmpoverride1));
+            if(~isempty(tmpoverride1))
+                tmpoverride2=['-override=',char(strjoin(tmpoverride1,','))];
+            else
+                tmpoverride2="";
+            end
+            %tmpoverride2=[' -override=',char(strjoin(tmpoverride1,','))];
+                       
+            linfields=fieldnames(obj.linearOptions);
+            tmpoverride1lin=strings(1,length(linfields));
+            for i=1:length(linfields)
+                tmpoverride1lin(i)=linfields(i)+"="+obj.linearOptions.(linfields{i});
+            end
+            overridelinear=char(strjoin(tmpoverride1lin,','));
+            %disp(overridelinear)
+            if(obj.inputflag==true)
+                obj.createcsvData()                
+                csvinput=join(['-csvInput=',obj.csvfile]);
+            else
+                csvinput="";
+            end
+            linexpr=strcat('linearize(',obj.modelname,',',overridelinear,',','simflags=','"',csvinput,' ',tmpoverride2,'")');
+            %disp(linexpr)
+            %res=obj.sendExpression("linearize(" + obj.modelname + ")");
+            res=obj.sendExpression(linexpr);
+            %disp(res)
         end
         
         function result = getSolutions(obj,args)
