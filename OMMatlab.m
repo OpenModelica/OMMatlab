@@ -44,8 +44,15 @@ classdef OMMatlab < handle
         outputlist=struct
         mappednames=struct
         overridevariables=struct
-        linearOptions=struct('startTime','0.0','stopTime','1.0','numberOfIntervals','500','stepSize','0.002','tolerance','1e-6')
         inputflag=false
+        linearOptions=struct('startTime','0.0','stopTime','1.0','numberOfIntervals','500','stepSize','0.002','tolerance','1e-6')
+        linearfile
+        linearFlag
+        linearmodelname
+        linearinputs
+        linearoutputs
+        linearstates
+        linearquantitylist
         %fileid
     end
     methods
@@ -582,7 +589,7 @@ classdef OMMatlab < handle
             %disp("roger")
             %disp(length(tmpoverride1));
             if(~isempty(tmpoverride1))
-                tmpoverride2=['-override=',char(strjoin(tmpoverride1,','))];
+                tmpoverride2=[' -override=',char(strjoin(tmpoverride1,','))];
             else
                 tmpoverride2="";
             end
@@ -601,11 +608,23 @@ classdef OMMatlab < handle
             else
                 csvinput="";
             end
-            linexpr=strcat('linearize(',obj.modelname,',',overridelinear,',','simflags=','"',csvinput,' ',tmpoverride2,'")');
-            %disp(linexpr)
+            linexpr=strcat('linearize(',obj.modelname,',',overridelinear,',','simflags=','"',csvinput,'  ',tmpoverride2,'")');
             %res=obj.sendExpression("linearize(" + obj.modelname + ")");
             res=obj.sendExpression(linexpr);
-            %disp(res)
+            obj.resultfile=res.("resultFile");
+            obj.linearmodelname=strcat('linear_',obj.modelname);
+            obj.linearfile=replace(fullfile(obj.mattempdir,[char(obj.linearmodelname),'.mo']),'\','/');
+            if(isfile(obj.linearfile))
+                loadmsg=obj.sendExpression("loadFile("""+ obj.linearfile + """)");
+                if(loadmsg=="false")
+                  disp(obj.sendExpression("getErrorString()"));
+                  return;
+                end
+                cNames =obj.sendExpression("getClassNames()");
+                buildmodelexpr=join(["buildModel(",cNames(1),")"]);
+                buildModelmsg=obj.sendExpression(buildmodelexpr);
+%                 disp(buildModelmsg(:))
+            end
         end
         
         function result = getSolutions(obj,args)
@@ -666,7 +685,7 @@ classdef OMMatlab < handle
       
         function result = parseExpression(~,args)
             %final=regexp(args,'(?<=")[^"]+(?=")|[{}(),]|[a-zA-Z0-9.]+','match');
-            final=regexp(args,'"(.*?)"|[{}()=]|[a-zA-Z0-9.]+','match');
+            final=regexp(args,'"(.*?)"|[{}()=]|[a-zA-Z0-9_.]+','match');
             %final=regexp(args,'"([^"]|\n)*"|[{}()=]|[a-zA-Z0-9.]+','match');
             if(length(final)>1)
                 if(final(1)=="{" && final(2)~="{")
