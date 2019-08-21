@@ -234,19 +234,6 @@ classdef OMMatlab < handle
                         value = '';
                     end
                     obj.quantitieslist(k+1).('value') = value;
-                    if(obj.linearFlag==true)
-                        if(alias=="alias")
-                            if (name(2) == 'x')
-                                obj.linearstates=[obj.linearstates,name(4:end-1)];
-                            end
-                            if (name(2) == 'u')
-                                obj.linearinputs=[obj.linearinputs,name(4:end-1)];
-                            end
-                            if (name(2) == 'y')
-                                obj.linearoutputs=[obj.linearoutputs,name(4:end-1)];
-                            end
-                        end
-                     end
                     
                     % check for variability parameter and add to parameter list
                     if(strcmp(variability,'parameter'))
@@ -281,6 +268,20 @@ classdef OMMatlab < handle
                             createvalidnames(obj,name,value,"output");
                         end
                     end
+                    if(obj.linearFlag==true)
+                        if(alias=="alias")
+                            if (name(2) == 'x')
+                                obj.linearstates=[obj.linearstates,name(4:end-1)];
+                            end
+                            if (name(2) == 'u')
+                                obj.linearinputs=[obj.linearinputs,name(4:end-1)];
+                            end
+                            if (name(2) == 'y')
+                                obj.linearoutputs=[obj.linearoutputs,name(4:end-1)];
+                            end
+                        end
+                        obj.linearquantitylist=[obj.linearquantitylist,obj.quantitieslist(k+1)];
+                     end
                 end
             else
                 msg="xmlfile is not generated";
@@ -584,7 +585,7 @@ classdef OMMatlab < handle
             
         end
         
-        function linearize(obj)
+        function result = linearize(obj)
             linres=obj.sendExpression("setCommandLineOptions(""+generateSymbolicLinearization"")");
             %disp(linres);
             %disp(obj.modelname);
@@ -637,17 +638,81 @@ classdef OMMatlab < handle
                 if(~isempty(buildModelmsg(1)))
                     obj.linearFlag=true;
                     obj.xmlfile=replace(fullfile(obj.mattempdir,char(buildModelmsg(2))),'\','/');
-                    obj.linearquantitylist
+                    obj.linearquantitylist=[];
                     obj.linearinputs=strings(0,0);
                     obj.linearoutputs=strings(0,0);
                     obj.linearstates=strings(0,0);
                     xmlparse(obj)
+                    result=getLinearMatrix(obj);
                 else
                     disp(omc.sendExpression("getErrorString()"));
                 end
             end
+            return;
         end
         
+        function result = getLinearMatrix(obj)
+            matrix_A=struct; 
+            matrix_B=struct;
+            matrix_C=struct;
+            matrix_D=struct;
+
+            for i=1:length(obj.linearquantitylist)
+                name=obj.linearquantitylist(i).("name");
+                value= obj.linearquantitylist(i).("value");
+                if( obj.linearquantitylist(i).("variability")=="parameter")
+                    if(name(1)=='A')
+                        tmpname=matlab.lang.makeValidName(name);
+                        matrix_A.(tmpname)=value;
+                    end
+                    if(name(1)=='B')
+                        tmpname=matlab.lang.makeValidName(name);
+                        matrix_B.(tmpname)=value;
+                    end
+                    if(name(1)=='C')
+                        tmpname=matlab.lang.makeValidName(name);
+                        matrix_C.(tmpname)=value;
+                    end
+                    if(name(1)=='D')
+                        tmpname=matlab.lang.makeValidName(name);
+                        matrix_D.(tmpname)=value;
+                    end
+                end
+            end
+            FullLinearMatrix={};
+            tmpMatrix_A=getLinearMatrixValues(obj,matrix_A);
+            tmpMatrix_B=getLinearMatrixValues(obj,matrix_B);
+            tmpMatrix_C=getLinearMatrixValues(obj,matrix_C);
+            tmpMatrix_D=getLinearMatrixValues(obj,matrix_D);
+            FullLinearMatrix{1}=tmpMatrix_A;
+            FullLinearMatrix{2}=tmpMatrix_B;
+            FullLinearMatrix{3}=tmpMatrix_C;
+            FullLinearMatrix{4}=tmpMatrix_D;
+            result=FullLinearMatrix;
+            return;
+        end
+            
+        function result = getLinearMatrixValues(~,matrix_name)
+            if(~isempty(matrix_name))
+                fields=fieldnames(matrix_name);
+                t=fields{end};
+                rows=str2double(t(3));
+                columns=str2double(t(5));
+                tmpMatrix=zeros(rows,columns,'double');
+                for i=1:length(fields)
+                    n=fields{i};
+                    r=str2double(n(3));
+                    c=str2double(n(5));
+                    val=str2double(matrix_name.(fields{i}));
+                    format shortG
+                    tmpMatrix(r,c)=val;
+                end
+                result=tmpMatrix;
+            else
+                result=zeros(0,0);
+            end
+        end
+
         function result = getLinearInputs(obj)
             if(obj.linearFlag==true)
                 result=obj.linearinputs;
