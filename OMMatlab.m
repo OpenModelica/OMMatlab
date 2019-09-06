@@ -44,6 +44,7 @@ classdef OMMatlab < handle
         outputlist=struct
         mappednames=struct
         overridevariables=struct
+        simoptoverride=struct
         inputflag=false
         linearOptions=struct('startTime','0.0','stopTime','1.0','numberOfIntervals','500','stepSize','0.002','tolerance','1e-6')
         linearfile
@@ -197,6 +198,11 @@ classdef OMMatlab < handle
             xmlpath=fullfile(obj.mattempdir,char(buildModelResult(2)));
             obj.xmlfile = replace(xmlpath,'\','/');
             xmlparse(obj);
+        end
+        
+        function workdir = getWorkDirectory(obj)
+            workdir = obj.mattempdir;
+            return; 
         end
         
         function xmlparse(obj)
@@ -409,7 +415,8 @@ classdef OMMatlab < handle
                     value=split(val,"=");
                     if(isfield(obj.simulationoptions,char(value(1))))
                         obj.simulationoptions.(value(1))= value(2);
-                        obj.overridevariables.(value(1))= value(2);
+                        obj.simoptoverride.(value(1)) = value(2);
+                        %obj.overridevariables.(value(1))= value(2);
                     else
                         disp(value(1) + " is not a Simulation Option");
                         return;
@@ -487,8 +494,8 @@ classdef OMMatlab < handle
             %disp(tmpcsvdata)
             %disp(length(time))  
             if(isempty(time))
-                time=[time,obj.simulationoptions.('startTime')];
-                time=[time,obj.simulationoptions.('stopTime')];
+                time=[time,char(obj.simulationoptions.('startTime'))];
+                time=[time,char(obj.simulationoptions.('stopTime'))];
             end
             %disp(time)
             %disp(sort(time))
@@ -542,7 +549,14 @@ classdef OMMatlab < handle
             fclose(fileID);
         end
         
-        function simulate(obj)
+        function simulate(obj,resultfile)
+            if exist('resultfile', 'var')
+                r=join([' -r=',char(resultfile)]);
+                obj.resultfile=replace(fullfile(obj.mattempdir,char(resultfile)),'\','/');
+            else
+                r='';
+                obj.resultfile=replace(fullfile(obj.mattempdir,[char(obj.modelname),'_res.mat']),'\','/');
+            end
             if(isfile(obj.xmlfile))
                 if (ispc)
                     getexefile = replace(fullfile(obj.mattempdir,[char(obj.modelname),'.exe']),'\','/');
@@ -553,27 +567,35 @@ classdef OMMatlab < handle
                 curdir=pwd;
                 if(isfile(getexefile))
                     cd(obj.mattempdir)
-                    fields=fieldnames(obj.overridevariables);
-                    tmpoverride1=strings(1,length(fields));
-                    for i=1:length(fields)
-                        tmpoverride1(i)=fields(i)+"="+obj.overridevariables.(fields{i});
+                    if(~isempty(fieldnames(obj.overridevariables)) || ~isempty(fieldnames(obj.simoptoverride)))
+                        names = [fieldnames(obj.overridevariables); fieldnames(obj.simoptoverride)];
+                        tmpstruct = cell2struct([struct2cell(obj.overridevariables); struct2cell(obj.simoptoverride)], names, 1);
+                        fields=fieldnames(tmpstruct);
+                        tmpoverride1=strings(1,length(fields));
+                        for i=1:length(fields)
+                            if (isfield(obj.mappednames,fields(i)))
+                                name=obj.mappednames.(fields{i});
+                            else
+                                name=fields(i);
+                            end
+                            tmpoverride1(i)=name+"="+tmpstruct.(fields{i});
+                        end
+                        overridevar=[' -override=',char(strjoin(tmpoverride1,','))];
+                    else
+                        overridevar='';
                     end
-                    tmpoverride2=[' -override=',char(strjoin(tmpoverride1,','))];
-                    %disp(tmpoverride2);
+                    
                     if(obj.inputflag==true)
                         obj.createcsvData()
-                        %disp("inputflag")
-                        %disp(obj.csvfile)
                         csvinput=join([' -csvInput=',obj.csvfile]);
-                        %disp(csvinput)
-                        finalsimulationexe = [getexefile,tmpoverride2,csvinput];
                     else
-                        finalsimulationexe = [getexefile,tmpoverride2];
+                        csvinput='';
                     end
-                    %finalsimulationexe = [getexefile,tmpoverride2,csvinput];
+                    
+                    finalsimulationexe = [getexefile,overridevar,csvinput,r];
                     %disp(finalsimulationexe);
                     system(finalsimulationexe);
-                    obj.resultfile=replace(fullfile(obj.mattempdir,[char(obj.modelname),'_res.mat']),'\','/');
+                    %obj.resultfile=replace(fullfile(obj.mattempdir,[char(obj.modelname),'_res.mat']),'\','/');
                 else
                     disp("Model cannot be Simulated: executable not found")
                 end
@@ -740,36 +762,26 @@ classdef OMMatlab < handle
             return;
         end
         
-        function result = getSolutions(obj,args)
-            if(isfile(obj.resultfile))
+        function result = getSolutions(obj,args,resultfile)
+            if exist('resultfile', 'var')
+                resfile = char(resultfile);
+            else
+                resfile = obj.resultfile;
+            end            
+            if(isfile(resfile))
                 if exist('args', 'var')
                     tmp1=strjoin(cellstr(args),',');
                     tmp2=['{',tmp1,'}'];
-                    %disp(tmp2)
-                    simresult=obj.sendExpression("readSimulationResult(""" + obj.resultfile + ""","+tmp2+")");
-                    %data=eval(simresult);
-                    %disp("size is:" +length(data));
-                    % create an empty cell array of fixed length
-%                     finalresults={length(simresult)};
-%                     for n=1:length(simresult)
-%                         %disp("loop val:" + n);
-%                         finalresults{n} = cell2mat(simresult{1,n});
-%                     end
-%                     result = finalresults;
+                    simresult=obj.sendExpression("readSimulationResult(""" + resfile + ""","+tmp2+")");
                     result=simresult;
                 else
-                    tmp1=obj.sendExpression("readSimulationResultVars(""" + obj.resultfile + """)");
-%                     disp(tmp1);
-%                     tmp2=eval(tmp1);
-%                     tmp3=strings(1,length(tmp2));
-%                     for i=1:length(tmp2)
-%                         tmp3(i)=tmp2{i};
-%                     end
+                    tmp1=obj.sendExpression("readSimulationResultVars(""" + resfile + """)");
                     result = tmp1();
                 end
                 return;
             else
-                disp("Model not Simulated, Simulate the model to get the results")
+                result= "Result File does not exist! " + char(resfile);
+                disp(result);
                 return;
             end
         end
