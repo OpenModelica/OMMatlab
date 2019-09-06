@@ -356,7 +356,7 @@ classdef OMMatlab < handle
             if exist('args', 'var')
                 continuous=strings(1,length(args));
                 for n=1:length(args)
-                    continuous(n) = obj.outputlist.(args(n));
+                    continuous(n) = obj.continuouslist.(args(n));
                 end
                 result = continuous;
             else
