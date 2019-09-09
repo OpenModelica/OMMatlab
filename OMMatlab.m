@@ -767,16 +767,16 @@ classdef OMMatlab < handle
                 resfile = char(resultfile);
             else
                 resfile = obj.resultfile;
-            end            
+            end
             if(isfile(resfile))
-                if exist('args', 'var')
+                if exist('args', 'var') && ~isempty(args)
                     tmp1=strjoin(cellstr(args),',');
                     tmp2=['{',tmp1,'}'];
                     simresult=obj.sendExpression("readSimulationResult(""" + resfile + ""","+tmp2+")");
                     result=simresult;
                 else
                     tmp1=obj.sendExpression("readSimulationResultVars(""" + resfile + """)");
-                    result = tmp1();
+                    result = tmp1;
                 end
                 return;
             else
@@ -808,7 +808,7 @@ classdef OMMatlab < handle
             end
         end
       
-        function result = parseExpression(~,args)
+        function result = parseExpression(obj,args)
             %final=regexp(args,'(?<=")[^"]+(?=")|[{}(),]|[a-zA-Z0-9.]+','match');
             final=regexp(args,'"(.*?)"|[{}()=]|[a-zA-Z0-9_.]+','match');
             %final=regexp(args,'"([^"]|\n)*"|[{}()=]|[a-zA-Z0-9.]+','match');
@@ -854,7 +854,9 @@ classdef OMMatlab < handle
                             value=replace(final(i+1),"""","");
                             result.(final(i-1))= value;
                         end
-                    end                    
+                    end
+                elseif(final(1)=="fail")
+                    result=obj.sendExpression("getErrorString()");
                 else
                     %reply=final;
                     disp("returning unparsed string")
@@ -862,7 +864,7 @@ classdef OMMatlab < handle
                     %result=args;
                 end
             elseif(length(final)==1)
-                  result=replace(final,"""","");
+                result=replace(final,"""","");
             else
                 disp("returning unparsed string")
                 result=replace(args,"""","");
