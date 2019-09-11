@@ -494,18 +494,15 @@ classdef OMMatlab < handle
             %disp(tmpcsvdata)
             %disp(length(time))  
             if(isempty(time))
-                time=[time,char(obj.simulationoptions.('startTime'))];
-                time=[time,char(obj.simulationoptions.('stopTime'))];
-            end
-            %disp(time)
-            %disp(sort(time))
-            
+                time=[str2double(obj.simulationoptions.('startTime')),str2double(obj.simulationoptions.('stopTime'))];
+            end            
             t1=struct2cell(tmpcsvdata);
             %disp(length(t1))
             sortedtime=sort(time);
             previousvalue=struct;
             for t=1:length(sortedtime)
                 fprintf(fileID,[num2str(sortedtime(t)),',']);
+                %fprintf(fileID,[char(sortedtime(t)),',']);
                 listcount=1;
                 for i=1:length(t1)
                     tmp1=t1{i};
