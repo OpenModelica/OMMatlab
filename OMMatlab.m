@@ -2,15 +2,15 @@
 % Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
 % c/o Linköpings universitet, Department of Computer and Information Science,
 % SE-58183 Linköping, Sweden.
-% 
+%
 % All rights reserved.
-% 
+%
 % THIS PROGRAM IS PROVIDED UNDER THE TERMS OF THE BSD NEW LICENSE OR THE
 % GPL VERSION 3 LICENSE OR THE OSMC PUBLIC LICENSE (OSMC-PL) VERSION 1.2.
 % ANY USE, REPRODUCTION OR DISTRIBUTION OF THIS PROGRAM CONSTITUTES
 % RECIPIENT'S ACCEPTANCE OF THE OSMC PUBLIC LICENSE OR THE GPL VERSION 3,
 % ACCORDING TO RECIPIENTS CHOICE.
-% 
+%
 % The OpenModelica software and the OSMC (Open Source Modelica Consortium)
 % Public License (OSMC-PL) are obtained from OSMC, either from the above
 % address, from the URLs: http://www.openmodelica.org or
@@ -18,7 +18,7 @@
 % distribution. GNU version 3 is obtained from:
 % http://www.gnu.org/copyleft/gpl.html. The New BSD License is obtained from:
 % http://www.opensource.org/licenses/BSD-3-Clause.
-% 
+%
 % This program is distributed WITHOUT ANY WARRANTY; without even the implied
 % warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE, EXCEPT AS
 % EXPRESSLY SET FORTH IN THE BY RECIPIENT SELECTED SUBSIDIARY LICENSE
@@ -37,7 +37,7 @@ classdef OMMatlab < handle
         csvfile=''
         mattempdir=''
         simulationoptions=struct
-        quantitieslist=struct
+        quantitieslist=[]
         parameterlist=struct
         continuouslist=struct
         inputlist=struct
@@ -68,10 +68,10 @@ classdef OMMatlab < handle
                 if ~exist('omcpath', 'var')
                     omhome = getenv('OPENMODELICAHOME');
                     omhomepath = replace(fullfile(omhome,'bin','omc.exe'),'\','/');
-                    % add omhome to path environment variabel
-                    %                 path1 = getenv('PATH');
-                    %                 path1 = [path1 omhome];
-                    %                 setenv('PATH', path1);
+                    %add omhome to path environment variabel
+                    %path1 = getenv('PATH');
+                    %path1 = [path1 omhome];
+                    %setenv('PATH', path1);
                     %cmd ="START /b "+omhomepath +" --interactive=zmq +z=matlab."+randomstring;
                     %cmd = ['START /b',' ',omhomepath,' --interactive=zmq +z=matlab.',randomstring];
                     startInfo.FileName=omhomepath;
@@ -174,16 +174,6 @@ classdef OMMatlab < handle
             mkdir(obj.mattempdir);
             obj.sendExpression("cd("""+ obj.mattempdir +""")")
             BuildModelicaModel(obj)
-            %             buildModelResult=obj.sendExpression("buildModel("+ modelname +")");
-            %             r2=split(erase(string(buildModelResult),["{","}",""""]),",");
-            %             %disp(r2);
-            %             if(isempty(r2{1}))
-            %                 disp(obj.sendExpression("getErrorString()"));
-            %                 return;
-            %             end
-            %             xmlpath =strcat(pwd,'\',r2{2});
-            %             obj.xmlfile = replace(xmlpath,'\','/');
-            %             xmlparse(obj);
         end
         
         function BuildModelicaModel(obj)
@@ -202,7 +192,7 @@ classdef OMMatlab < handle
         
         function workdir = getWorkDirectory(obj)
             workdir = obj.mattempdir;
-            return; 
+            return;
         end
         
         function xmlparse(obj)
@@ -219,63 +209,70 @@ classdef OMMatlab < handle
                 % ScalarVariables %
                 allvaritem = xDoc.getElementsByTagName('ScalarVariable');
                 for k = 0:allvaritem.getLength-1
-                    name=char(allvaritem.item(k).getAttribute('name'));
-                    changeable=char(allvaritem.item(k).getAttribute('isValueChangeable'));
-                    description=char(allvaritem.item(k).getAttribute('description'));
-                    variability=char(allvaritem.item(k).getAttribute('variability'));
-                    causality =char(allvaritem.item(k).getAttribute('causality'));
-                    alias=char(allvaritem.item(k).getAttribute('alias'));
-                    aliasVariable=char(allvaritem.item(k).getAttribute('aliasVariable'));
-                    obj.quantitieslist(k+1).('name')=name;
-                    obj.quantitieslist(k+1).('changeable')=changeable;
-                    obj.quantitieslist(k+1).('description')=description;
-                    obj.quantitieslist(k+1).('variability')=variability;
-                    obj.quantitieslist(k+1).('causality')=causality;
-                    obj.quantitieslist(k+1).('alias')=alias;
-                    obj.quantitieslist(k+1).('aliasVariable')=aliasVariable;
+                    scalar=struct;
+                    scalar.('name')=char(allvaritem.item(k).getAttribute('name'));
+                    scalar.('changeable')=char(allvaritem.item(k).getAttribute('isValueChangeable'));
+                    scalar.('description')=char(allvaritem.item(k).getAttribute('description'));
+                    scalar.('variability')=char(allvaritem.item(k).getAttribute('variability'));
+                    scalar.('causality') =char(allvaritem.item(k).getAttribute('causality'));
+                    scalar.('alias')=char(allvaritem.item(k).getAttribute('alias'));
+                    scalar.('aliasVariable')=char(allvaritem.item(k).getAttribute('aliasVariable'));
+%                     obj.quantitieslist(k+1).('name')=name;
+%                     obj.quantitieslist(k+1).('changeable')=changeable;
+%                     obj.quantitieslist(k+1).('description')=description;
+%                     obj.quantitieslist(k+1).('variability')=variability;
+%                     obj.quantitieslist(k+1).('causality')=causality;
+%                     obj.quantitieslist(k+1).('alias')=alias;
+%                     obj.quantitieslist(k+1).('aliasVariable')=aliasVariable;
                     sub = allvaritem.item(k).getElementsByTagName('Real');
                     try
                         value = char(sub.item(0).getAttribute('start'));
                     catch
                         value = '';
                     end
-                    obj.quantitieslist(k+1).('value') = value;
+                    scalar.('value')=value;
+                    %obj.quantitieslist(k+1).('value') = value;
                     
                     % check for variability parameter and add to parameter list
-                    if(strcmp(variability,'parameter'))
-                        try
-                            obj.parameterlist.(name) = value;
-                        catch ME
-                            createvalidnames(obj,name,value,"parameter");
+                    if(obj.linearFlag==false)
+                        name=scalar.('name');
+                        value=scalar.('value');
+                        if(strcmp(scalar.('variability'),'parameter'))
+                            try
+                                obj.parameterlist.(name) = value;
+                            catch ME
+                                createvalidnames(obj,name,value,"parameter");
+                            end
                         end
-                    end
-                    % check for variability continuous and add to continuous list
-                    if(strcmp(variability,'continuous'))
-                        try
-                            obj.continuouslist.(name) = value;
-                        catch ME
-                            createvalidnames(obj,name,value,"continuous");
+                        % check for variability continuous and add to continuous list
+                        if(strcmp(scalar.('variability'),'continuous'))
+                            try
+                                obj.continuouslist.(name) = value;
+                            catch ME
+                                createvalidnames(obj,name,value,"continuous");
+                            end
                         end
-                    end
-                    
-                    % check for causality input and add to input list
-                    if(strcmp(causality,'input'))
-                        try
-                            obj.inputlist.(name) = value;
-                        catch ME
-                            createvalidnames(obj,name,value,"input");
+                        
+                        % check for causality input and add to input list
+                        if(strcmp(scalar.('causality'),'input'))
+                            try
+                                obj.inputlist.(name) = value;
+                            catch ME
+                                createvalidnames(obj,name,value,"input");
+                            end
                         end
-                    end
-                    % check for causality output and add to output list
-                    if(strcmp(causality,'output'))
-                        try
-                            obj.outputlist.(name) = value;
-                        catch ME
-                            createvalidnames(obj,name,value,"output");
+                        % check for causality output and add to output list
+                        if(strcmp(scalar.('causality'),'output'))
+                            try
+                                obj.outputlist.(name) = value;
+                            catch ME
+                                createvalidnames(obj,name,value,"output");
+                            end
                         end
                     end
                     if(obj.linearFlag==true)
-                        if(alias=="alias")
+                        if(scalar.('alias')=="alias")
+                            name=scalar.('name');
                             if (name(2) == 'x')
                                 obj.linearstates=[obj.linearstates,name(4:end-1)];
                             end
@@ -286,8 +283,10 @@ classdef OMMatlab < handle
                                 obj.linearoutputs=[obj.linearoutputs,name(4:end-1)];
                             end
                         end
-                        obj.linearquantitylist=[obj.linearquantitylist,obj.quantitieslist(k+1)];
-                     end
+                        obj.linearquantitylist=[obj.linearquantitylist,scalar];
+                    else
+                        obj.quantitieslist=[obj.quantitieslist,scalar];
+                    end
                 end
             else
                 msg="xmlfile is not generated";
@@ -309,6 +308,23 @@ classdef OMMatlab < handle
                 result=struct2table(tmpresult,'AsArray',true);
             else
                 result=struct2table(obj.quantitieslist,'AsArray',true);
+            end
+            return;
+        end
+        
+        function result= getLinearQuantities(obj,args)
+            if exist('args', 'var')
+                tmpresult=[];
+                for n=1:length(args)
+                    for q=1:length(obj.linearquantitylist)
+                        if(strcmp(obj.linearquantitylist(q).name,args(n)))
+                            tmpresult=[tmpresult;obj.linearquantitylist(q)];
+                        end
+                    end
+                end
+                result=struct2table(tmpresult,'AsArray',true);
+            else
+                result=struct2table(obj.linearquantitylist,'AsArray',true);
             end
             return;
         end
@@ -476,7 +492,7 @@ classdef OMMatlab < handle
                 var = obj.inputlist.(fields{i});
                 if(isempty(var))
                     var="0";
-                end 
+                end
                 s1 = eval(replace(replace(replace(replace(var,"[","{"),"]","}"),"(","{"),")","}"));
                 tmpcsvdata.(char(fields(i))) = s1;
                 %csvdata.()=s1;
@@ -489,13 +505,13 @@ classdef OMMatlab < handle
                         time=[time,t{1}{1}];
                         count=count+1;
                     end
-                end                
+                end
             end
             %disp(tmpcsvdata)
-            %disp(length(time))  
+            %disp(length(time))
             if(isempty(time))
                 time=[str2double(obj.simulationoptions.('startTime')),str2double(obj.simulationoptions.('stopTime'))];
-            end            
+            end
             t1=struct2cell(tmpcsvdata);
             %disp(length(t1))
             sortedtime=sort(time);
@@ -513,7 +529,7 @@ classdef OMMatlab < handle
                             if(sortedtime(t)==tmp1{k}{1})
                                 %disp(sortedtime(t)+ "=>" + tmp1{k}{1})
                                 data=tmp1{k}{2};
-%                                 disp(sortedtime(t)+ "=>" + data)
+                                %disp(sortedtime(t)+ "=>" + data)
                                 fprintf(fileID,[num2str(data),',']);
                                 %pfieldname=matlab.lang.makeValidName(string(listcount));
                                 pfieldname="x"+string(listcount);
@@ -528,21 +544,21 @@ classdef OMMatlab < handle
                             %disp(previousvalue)
                             %disp(string(listcount))
                             tmpfieldname="x"+string(listcount);
-%                             disp("false loop" + previousvalue.(tmpfieldname))
+                            %disp("false loop" + previousvalue.(tmpfieldname))
                             data=previousvalue.(tmpfieldname);
                             fprintf(fileID,[num2str(data),',']);
                         end
                     else
-%                         disp("strings found" + t1{i})
-%                         disp(class(t1{i}))
-%                         fprintf(fileID,'%s',t1{i},',');
+                        %disp("strings found" + t1{i})
+                        %disp(class(t1{i}))
+                        %fprintf(fileID,'%s',t1{i},',');
                         fprintf(fileID,[num2str(t1{i}),',']);
                     end
                     listcount=listcount+1;
                 end
                 fprintf(fileID,[num2str(0),'\n']);
-%                 disp(sortedtime(t) + "****************************")
-            end           
+                %disp(sortedtime(t) + "****************************")
+            end
             fclose(fileID);
         end
         
@@ -600,7 +616,7 @@ classdef OMMatlab < handle
                 %disp(pwd)
             else
                 disp("Model cannot be Simulated: xmlfile not found")
-            end 
+            end
             
         end
         
@@ -624,7 +640,7 @@ classdef OMMatlab < handle
             else
                 tmpoverride2="";
             end
-                       
+            
             linfields=fieldnames(obj.linearOptions);
             tmpoverride1lin=strings(1,length(linfields));
             for i=1:length(linfields)
@@ -633,7 +649,7 @@ classdef OMMatlab < handle
             overridelinear=char(strjoin(tmpoverride1lin,','));
             
             if(obj.inputflag==true)
-                obj.createcsvData()                
+                obj.createcsvData()
                 csvinput=join(['-csvInput=',obj.csvfile]);
             else
                 csvinput="";
@@ -647,8 +663,8 @@ classdef OMMatlab < handle
             if(isfile(obj.linearfile))
                 loadmsg=obj.sendExpression("loadFile("""+ obj.linearfile + """)");
                 if(loadmsg=="false")
-                  disp(obj.sendExpression("getErrorString()"));
-                  return;
+                    disp(obj.sendExpression("getErrorString()"));
+                    return;
                 end
                 cNames =obj.sendExpression("getClassNames()");
                 buildmodelexpr=join(["buildModel(",cNames(1),")"]);
@@ -671,11 +687,11 @@ classdef OMMatlab < handle
         end
         
         function result = getLinearMatrix(obj)
-            matrix_A=struct; 
+            matrix_A=struct;
             matrix_B=struct;
             matrix_C=struct;
             matrix_D=struct;
-
+            
             for i=1:length(obj.linearquantitylist)
                 name=obj.linearquantitylist(i).("name");
                 value= obj.linearquantitylist(i).("value");
@@ -710,7 +726,7 @@ classdef OMMatlab < handle
             result=FullLinearMatrix;
             return;
         end
-            
+        
         function result = getLinearMatrixValues(~,matrix_name)
             if(~isempty(matrix_name))
                 fields=fieldnames(matrix_name);
@@ -731,7 +747,7 @@ classdef OMMatlab < handle
                 result=zeros(0,0);
             end
         end
-
+        
         function result = getLinearInputs(obj)
             if(obj.linearFlag==true)
                 result=obj.linearinputs;
@@ -770,9 +786,11 @@ classdef OMMatlab < handle
                     tmp1=strjoin(cellstr(args),',');
                     tmp2=['{',tmp1,'}'];
                     simresult=obj.sendExpression("readSimulationResult(""" + resfile + ""","+tmp2+")");
+                    obj.sendExpression("closeSimulationResultFile()");
                     result=simresult;
                 else
                     tmp1=obj.sendExpression("readSimulationResultVars(""" + resfile + """)");
+                    obj.sendExpression("closeSimulationResultFile()");
                     result = tmp1;
                 end
                 return;
@@ -804,7 +822,7 @@ classdef OMMatlab < handle
                 obj.outputlist.(tmpname)= value;
             end
         end
-      
+        
         function result = parseExpression(obj,args)
             %final=regexp(args,'(?<=")[^"]+(?=")|[{}(),]|[a-zA-Z0-9.]+','match');
             final=regexp(args,'"(.*?)"|[{}()=]|[a-zA-Z0-9_.]+','match');
@@ -867,14 +885,14 @@ classdef OMMatlab < handle
                 result=replace(args,"""","");
             end
         end
-
+        
         function delete(obj)
             %disp("inside delete")
             delete(obj.portfile);
             obj.requester.close();
-            delete(obj);
             % kill the spwaned process for omc
             obj.process.Kill()
+            delete(obj);
         end
     end
 end
