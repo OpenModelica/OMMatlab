@@ -122,11 +122,16 @@ classdef OMMatlab < handle
         
         
         function reply = sendExpression(obj,expr)
-            obj.requester.send(expr,0);
-            data=obj.requester.recvStr(0);
-            % Parse java string object and return in appropriate matlab
-            % structure if possible, otherwise return as normal strings
-            reply=parseExpression(obj,string(data));
+            if(~obj.process.HasExited)
+                obj.requester.send(expr,0);
+                data=obj.requester.recvStr(0);
+                % Parse java string object and return in appropriate matlab
+                % structure if possible, otherwise return as normal strings
+                reply=parseExpression(obj,string(data));
+            else
+                disp("Process Exited, No connection with OMC. Create a new instance of OMMatlab session");
+                return
+            end
         end
         
         function ModelicaSystem(obj,filename,modelname,libraries)
