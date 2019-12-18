@@ -567,13 +567,23 @@ classdef OMMatlab < handle
             fclose(fileID);
         end
         
-        function simulate(obj,resultfile)
+        function simulate(obj,resultfile,simflags)
             if exist('resultfile', 'var')
-                r=join([' -r=',char(resultfile)]);
-                obj.resultfile=replace(fullfile(obj.mattempdir,char(resultfile)),'\','/');
+                %disp(resultfile);
+                if ~isempty(resultfile)
+                    r=join([' -r=',char(resultfile)]);
+                    obj.resultfile=replace(fullfile(obj.mattempdir,char(resultfile)),'\','/');
+                else
+                    r='';
+                end
             else
                 r='';
                 obj.resultfile=replace(fullfile(obj.mattempdir,[char(obj.modelname),'_res.mat']),'\','/');
+            end
+            if exist('simflags', 'var')
+                simflags=join([' ',char(simflags)]);
+            else
+                simflags='';
             end
             if(isfile(obj.xmlfile))
                 if (ispc)
@@ -610,7 +620,7 @@ classdef OMMatlab < handle
                         csvinput='';
                     end
                     
-                    finalsimulationexe = [getexefile,overridevar,csvinput,r];
+                    finalsimulationexe = [getexefile,overridevar,csvinput,r,simflags];
                     %disp(finalsimulationexe);
                     system(finalsimulationexe);
                     %obj.resultfile=replace(fullfile(obj.mattempdir,[char(obj.modelname),'_res.mat']),'\','/');
