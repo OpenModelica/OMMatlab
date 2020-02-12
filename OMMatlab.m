@@ -134,7 +134,7 @@ classdef OMMatlab < handle
             end
         end
         
-        function ModelicaSystem(obj,filename,modelname,libraries)
+        function ModelicaSystem(obj,filename,modelname,libraries,commandLineOptions)
             if (nargin < 2)
                 error('Not enough arguments, filename and classname is required');
             end
@@ -144,6 +144,17 @@ classdef OMMatlab < handle
                 error(msg);
                 return;
             end
+            
+            % check for commandLineOptions 
+            if exist('commandLineOptions', 'var')
+                exp=join(["setCommandLineOptions(","""",commandLineOptions,"""",")"]);
+                cmdExp=obj.sendExpression(exp);
+                if(cmdExp == "false")
+                    disp(obj.sendExpression("getErrorString()"));
+                    return;
+                end
+            end
+            
             filepath = replace(filename,'\','/');
             %disp(filepath);
             loadfilemsg=obj.sendExpression("loadFile( """+ filepath +""")");
