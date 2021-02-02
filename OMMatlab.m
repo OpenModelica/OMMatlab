@@ -754,7 +754,7 @@ classdef OMMatlab < handle
         end
         
         function result = getLinearMatrixValues(~,matrix_name)
-            if(~isempty(matrix_name))
+            if(~isempty(fieldnames(matrix_name)))
                 fields=fieldnames(matrix_name);
                 t=fields{end};
                 rows=str2double(t(3));
