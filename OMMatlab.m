@@ -1,7 +1,7 @@
-% This file is part of OpenModelica.
+ï»¿% This file is part of OpenModelica.
 % Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
-% c/o Linköpings universitet, Department of Computer and Information Science,
-% SE-58183 Linköping, Sweden.
+% c/o LinkÃ¶pings universitet, Department of Computer and Information Science,
+% SE-58183 LinkÃ¶ping, Sweden.
 %
 % All rights reserved.
 %
@@ -307,7 +307,6 @@ classdef OMMatlab < handle
             else
                 msg="xmlfile is not generated";
                 error(msg);
-                return;
             end
         end
         
@@ -696,18 +695,18 @@ classdef OMMatlab < handle
                 buildmodelexpr=join(["buildModel(",cNames(1),")"]);
                 buildModelmsg=obj.sendExpression(buildmodelexpr);
                 %disp(buildModelmsg(:))
-                if(~isempty(buildModelmsg(1)))
+                if(~(buildModelmsg(1)==""))
                     obj.linearFlag=true;
                     obj.xmlfile=replace(fullfile(obj.mattempdir,char(buildModelmsg(2))),'\','/');
                     obj.linearquantitylist=[];
                     obj.linearinputs=strings(0,0);
                     obj.linearoutputs=strings(0,0);
                     obj.linearstates=strings(0,0);
-                    xmlparse(obj)
-                    result=getLinearMatrix(obj);
+                    xmlparse(obj)                    
                 else
-                    disp(omc.sendExpression("getErrorString()"));
+                    disp(obj.sendExpression("getErrorString()"));
                 end
+                result=getLinearMatrix(obj);
             end
             return;
         end
@@ -754,7 +753,7 @@ classdef OMMatlab < handle
         end
         
         function result = getLinearMatrixValues(~,matrix_name)
-            if(~isempty(matrix_name))
+            if(~isempty(fieldnames(matrix_name)))
                 fields=fieldnames(matrix_name);
                 t=fields{end};
                 rows=str2double(t(3));
