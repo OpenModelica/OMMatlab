@@ -695,7 +695,7 @@ classdef OMMatlab < handle
                 buildmodelexpr=join(["buildModel(",cNames(1),")"]);
                 buildModelmsg=obj.sendExpression(buildmodelexpr);
                 %disp(buildModelmsg(:))
-                if(~(buildModelmsg(1)==""))
+                if(~(buildModelmsg(1)=="")) %This is a changed code
                     obj.linearFlag=true;
                     obj.xmlfile=replace(fullfile(obj.mattempdir,char(buildModelmsg(2))),'\','/');
                     obj.linearquantitylist=[];
