@@ -196,7 +196,7 @@ classdef OMMatlab < handle
             buildModelResult=obj.sendExpression("buildModel("+ obj.modelname +")");
             %r2=split(erase(string(buildModelResult),["{","}",""""]),",");
             %disp(r2);
-            if(isempty(buildModelResult(1)))
+            if(isempty(char(buildModelResult(1))))
                 disp(obj.sendExpression("getErrorString()"));
                 return;
             end
@@ -650,7 +650,7 @@ classdef OMMatlab < handle
             %disp(linres);
             %disp(obj.modelname);
             if(linres=="false")
-                disp("Linearization cannot be performed"+obj.sendExpression("getErrorString()"));
+                disp("Linearization cannot be performed "+obj.sendExpression("getErrorString()"));
                 return;
             end
             %linearize(SeborgCSTR.ModSeborgCSTRorg,startTime=0.0,stopTime=1.0,numberOfIntervals=500,stepSize=0.002,tolerance=1e-6,simflags="-csvInput=C:/Users/arupa54/AppData/Local/Temp/jl_59DA.tmp/SeborgCSTR.ModSeborgCSTRorg.csv -override=a=2.0")
@@ -683,8 +683,17 @@ classdef OMMatlab < handle
             %res=obj.sendExpression("linearize(" + obj.modelname + ")");
             res=obj.sendExpression(linexpr);
             obj.resultfile=res.("resultFile");
-            obj.linearmodelname=strcat('linear_',obj.modelname);
+
+            obj.linearmodelname=strcat('linearized_model');
             obj.linearfile=replace(fullfile(obj.mattempdir,[char(obj.linearmodelname),'.mo']),'\','/');
+           
+            % support older openmodelica versions before OpenModelica v1.16.2 
+            % where linearize() generates "linear_modelname.mo" file
+            if(~isfile(obj.linearfile))
+                obj.linearmodelname=strcat('linear_',obj.modelname);
+                obj.linearfile=replace(fullfile(obj.mattempdir,[char(obj.linearmodelname),'.mo']),'\','/');
+            end
+            
             if(isfile(obj.linearfile))
                 loadmsg=obj.sendExpression("loadFile("""+ obj.linearfile + """)");
                 if(loadmsg=="false")
@@ -695,7 +704,14 @@ classdef OMMatlab < handle
                 buildmodelexpr=join(["buildModel(",cNames(1),")"]);
                 buildModelmsg=obj.sendExpression(buildmodelexpr);
                 %disp(buildModelmsg(:))
-                if(~(buildModelmsg(1)=="")) %This is a changed code
+ new_branch1
+               
+
+                
+                % parse linearized_model_init.xml to get the matrix
+                % [A,B,C,D]
+                if(~isempty(char(buildModelmsg(1))))
+ master
                     obj.linearFlag=true;
                     obj.xmlfile=replace(fullfile(obj.mattempdir,char(buildModelmsg(2))),'\','/');
                     obj.linearquantitylist=[];
@@ -704,11 +720,18 @@ classdef OMMatlab < handle
                     obj.linearstates=strings(0,0);
                     xmlparse(obj)                    
                 else
-                    disp(obj.sendExpression("getErrorString()"));
+ new_branch1
+                    
+
+                    disp("Building linearized Model failed: " + obj.sendExpression("getErrorString()"));
+                    return;
                 end
-                result=getLinearMatrix(obj);
+            else
+                disp("Linearization failed: " + obj.linearfile + " not found")
+                disp(obj.sendExpression("getErrorString()"))
+                return;
+ master
             end
-            return;
         end
         
         function result = getLinearMatrix(obj)
@@ -850,7 +873,7 @@ classdef OMMatlab < handle
         
         function result = parseExpression(obj,args)
             %final=regexp(args,'(?<=")[^"]+(?=")|[{}(),]|[a-zA-Z0-9.]+','match');
-            final=regexp(args,'"(.*?)"|[{}()=]|[a-zA-Z0-9_.]+','match');
+            final=regexp(args,'"(.*?)"|[{}()=]|[-a-zA-Z0-9_.]+','match');
             %final=regexp(args,'"([^"]|\n)*"|[{}()=]|[a-zA-Z0-9.]+','match');
             if(length(final)>1)
                 if(final(1)=="{" && final(2)~="{")
