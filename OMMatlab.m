@@ -689,7 +689,7 @@ classdef OMMatlab < handle
            
             % support older openmodelica versions before OpenModelica v1.16.2 
             % where linearize() generates "linear_modelname.mo" file
-            if(~isfile(obj.linearfile))
+            if(isfile(obj.linearfile))
                 obj.linearmodelname=strcat('linear_',obj.modelname);
                 obj.linearfile=replace(fullfile(obj.mattempdir,[char(obj.linearmodelname),'.mo']),'\','/');
             end
@@ -703,34 +703,30 @@ classdef OMMatlab < handle
                 cNames =obj.sendExpression("getClassNames()");
                 buildmodelexpr=join(["buildModel(",cNames(1),")"]);
                 buildModelmsg=obj.sendExpression(buildmodelexpr);
-                %disp(buildModelmsg(:))
- new_branch1
-               
+                %disp(buildModelmsg(:))            
 
                 
                 % parse linearized_model_init.xml to get the matrix
                 % [A,B,C,D]
                 if(~isempty(char(buildModelmsg(1))))
- master
                     obj.linearFlag=true;
                     obj.xmlfile=replace(fullfile(obj.mattempdir,char(buildModelmsg(2))),'\','/');
                     obj.linearquantitylist=[];
                     obj.linearinputs=strings(0,0);
                     obj.linearoutputs=strings(0,0);
                     obj.linearstates=strings(0,0);
-                    xmlparse(obj)                    
+                    xmlparse(obj)
+                    result=getLinearMatrix(obj);
                 else
- new_branch1
                     
 
                     disp("Building linearized Model failed: " + obj.sendExpression("getErrorString()"));
-                    return;
+                    result=getLinearMatrix(obj);
                 end
             else
                 disp("Linearization failed: " + obj.linearfile + " not found")
                 disp(obj.sendExpression("getErrorString()"))
-                return;
- master
+                result=getLinearMatrix(obj);
             end
         end
         
