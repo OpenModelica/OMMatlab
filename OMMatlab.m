@@ -633,7 +633,15 @@ classdef OMMatlab < handle
                     
                     finalsimulationexe = [getexefile,overridevar,csvinput,r,simflags];
                     %disp(finalsimulationexe);
-                    system(finalsimulationexe);
+                    if ispc
+                        omhome = getenv('OPENMODELICAHOME');
+                        %set dll path needed for windows simulation
+                        dllpath = [replace(fullfile(omhome,'bin'),'\','/'),';',replace(fullfile(omhome,'lib/omc'),'\','/'),';',replace(fullfile(omhome,'lib/omc/cpp'),'\','/'),';',replace(fullfile(omhome,'lib/omc/omsicpp'),'\','/'),';',getenv('PATH')];
+                        %disp(dllpath);
+                        system(['set PATH=' dllpath ' && ' finalsimulationexe])
+                    else               
+                        system(finalsimulationexe);
+                    end
                     %obj.resultfile=replace(fullfile(obj.mattempdir,[char(obj.modelname),'_res.mat']),'\','/');
                 else
                     disp("Model cannot be Simulated: executable not found")
