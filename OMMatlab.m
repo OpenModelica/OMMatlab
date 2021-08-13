@@ -255,7 +255,11 @@ classdef OMMatlab < handle
                         value=scalar.('value');
                         if(strcmp(scalar.('variability'),'parameter'))
                             try
-                                obj.parameterlist.(name) = value;
+                                if isfield(obj.overridevariables, name)
+                                    obj.parameterlist.(name) = obj.overridevariables.(name);
+                                else
+                                    obj.parameterlist.(name) = value;
+                                end
                             catch ME
                                 createvalidnames(obj,name,value,"parameter");
                             end
