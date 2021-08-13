@@ -434,14 +434,28 @@ classdef OMMatlab < handle
                     val=replace(args(n)," ","");
                     value=split(val,"=");
                     if(isfield(obj.parameterlist,char(value(1))))
-                        obj.parameterlist.(value(1))= value(2);
-                        obj.overridevariables.(value(1))= value(2);
+                        if isParameterChangeable(obj, value(1), value(2))
+                            obj.parameterlist.(value(1))= value(2);
+                            obj.overridevariables.(value(1))= value(2);
+                        end
                     else
                         disp(value(1) + " is not a parameter");
                         return;
                     end
                 end
             end
+        end
+        
+        % check for parameter modifiable or not
+        function result = isParameterChangeable(obj, name, value)
+            q = getQuantities(obj, name);
+            if q.changeable{1} == "false"
+                disp("| info |  setParameters() failed : It is not possible to set the following signal " + """" + name + """" + ", It seems to be structural, final, protected or evaluated or has a non-constant binding, use sendExpression(setParameterValue("+ obj.modelname + ", " + name + ", " + value + "), parsed=false)" + " and rebuild the model using buildModel() API")
+                result = false;
+                return;
+            end
+            result = true;
+            return;
         end
         
         function setSimulationOptions(obj,args)
