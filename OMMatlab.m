@@ -37,7 +37,7 @@ classdef OMMatlab < handle
         csvfile=''
         mattempdir=''
         simulationoptions=struct
-        quantitieslist=[]
+        quantitieslist
         parameterlist=struct
         continuouslist=struct
         inputlist=struct
@@ -189,10 +189,10 @@ classdef OMMatlab < handle
             %disp("tempdir" + obj.mattempdir)
             mkdir(obj.mattempdir);
             obj.sendExpression("cd("""+ obj.mattempdir +""")")
-            BuildModelicaModel(obj)
+            buildModel(obj)
         end
         
-        function BuildModelicaModel(obj)
+        function buildModel(obj)
             buildModelResult=obj.sendExpression("buildModel("+ obj.modelname +")");
             %r2=split(erase(string(buildModelResult),["{","}",""""]),",");
             %disp(r2);
@@ -232,22 +232,22 @@ classdef OMMatlab < handle
                     scalar.('variability')=char(allvaritem.item(k).getAttribute('variability'));
                     scalar.('causality') =char(allvaritem.item(k).getAttribute('causality'));
                     scalar.('alias')=char(allvaritem.item(k).getAttribute('alias'));
-                    scalar.('aliasVariable')=char(allvaritem.item(k).getAttribute('aliasVariable'));
-%                     obj.quantitieslist(k+1).('name')=name;
-%                     obj.quantitieslist(k+1).('changeable')=changeable;
-%                     obj.quantitieslist(k+1).('description')=description;
-%                     obj.quantitieslist(k+1).('variability')=variability;
-%                     obj.quantitieslist(k+1).('causality')=causality;
-%                     obj.quantitieslist(k+1).('alias')=alias;
-%                     obj.quantitieslist(k+1).('aliasVariable')=aliasVariable;
-                    sub = allvaritem.item(k).getElementsByTagName('Real');
-                    try
-                        value = char(sub.item(0).getAttribute('start'));
-                    catch
-                        value = '';
+                    scalar.('aliasVariable')=char(allvaritem.item(k).getAttribute('aliasVariable'));                    
+
+                    % iterate subchild to find start values of all types
+                    childNode = getFirstChild(allvaritem.item(k));
+                    while ~isempty(childNode)
+                        if childNode.getNodeType == childNode.ELEMENT_NODE
+                            if childNode.hasAttribute('start')
+                                %disp(name + "=" + char(childNode.getAttribute('start')) + "=" + attr)
+                                scalar.('value') = char(childNode.getAttribute('start'));
+                            else
+                                scalar.('value') = 'None';
+                            end
+                            %scalar.('value')=value;
+                        end
+                        childNode = getNextSibling(childNode);
                     end
-                    scalar.('value')=value;
-                    %obj.quantitieslist(k+1).('value') = value;
                     
                     % check for variability parameter and add to parameter list
                     if(obj.linearFlag==false)
@@ -312,6 +312,10 @@ classdef OMMatlab < handle
         end
         
         function result= getQuantities(obj,args)
+            if isempty(obj.quantitieslist)
+                result = [];
+                return;
+            end
             if exist('args', 'var')
                 tmpresult=[];
                 for n=1:length(args)
