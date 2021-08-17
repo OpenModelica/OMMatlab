@@ -162,25 +162,36 @@ classdef OMMatlab < handle
                 disp(obj.sendExpression("getErrorString()"));
                 return;
             end
+            
             % check for libraries
             if exist('libraries', 'var')
                 %disp("library given");
-                for n=1:length(libraries)
-                    %disp("loop libraries:" + libraries{n});
-                    if(isfile(libraries{n}))
-                        libmsg = obj.sendExpression("loadFile( """+ libraries{n} +""")");
-                    else
-                        libmsg = obj.sendExpression("loadModel("+ libraries{n} +")");
+                if isa(libraries, 'struct')
+                    fields=fieldnames(libraries);
+                    for i=1:length(fieldnames(libraries))
+                        loadLibraryHelper(obj, fields(i), libraries.(fields{i}));
                     end
-                    %disp(libmsg);
-                    if (libmsg=="false")
-                        disp(obj.sendExpression("getErrorString()"));
-                        return;
+                elseif isa(libraries, 'string')
+                    for n=1:length(libraries)
+                        loadLibraryHelper(obj, libraries{n});
                     end
+                elseif isa(libraries, 'cell')
+                    for n=1:length(libraries)
+                        if isa(libraries{n}, 'struct')
+                            fields=fieldnames(libraries{n});
+                            for i=1:length(fieldnames(libraries{n}))
+                                loadLibraryHelper(obj, fields(i), libraries{n}.(fields{i}));
+                            end
+                        elseif isa(libraries{n}, 'string')
+                            loadLibraryHelper(obj, libraries{n});
+                        end
+                    end
+                else
+                    fprintf("| info | loadLibrary() failed, Unknown type detected:, The following patterns are supported \n1).""Modelica""\n2).[""Modelica"", ""PowerSystems""]\n3).struct(""Modelica"", ""3.2.3"")\n");
+                    return;
                 end
-            else
-                %disp("library not given");
             end
+            
             obj.filename = filename;
             obj.modelname = modelname;
             %tmpdirname = char(97 + floor(26 .* rand(15,1)))';
@@ -190,6 +201,28 @@ classdef OMMatlab < handle
             mkdir(obj.mattempdir);
             obj.sendExpression("cd("""+ obj.mattempdir +""")")
             buildModel(obj)
+        end
+        
+        function loadLibraryHelper(obj, libname, version)
+            if(isfile(libname))
+                libmsg = obj.sendExpression("loadFile( """+ libname +""")");
+                if (libmsg=="false")
+                    disp(obj.sendExpression("getErrorString()"));
+                    return;
+                end
+            else
+                if exist('version', 'var')
+                    libname = strcat("loadModel(", libname, ", ", "{", """", version, """", "}", ")");
+                else
+                    libname = strcat("loadModel(", libname, ")");
+                end
+                %disp(libname)
+                libmsg = obj.sendExpression(libname);
+                if (libmsg=="false")
+                    disp(obj.sendExpression("getErrorString()"));
+                    return;
+                end
+            end
         end
         
         function buildModel(obj)
