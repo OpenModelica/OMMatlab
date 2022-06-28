@@ -81,16 +81,16 @@ classdef OMMatlab < handle
                 if ismac && system("which omc") ~= 0
                     %cmd =['/opt/openmodelica/bin/omc --interactive=zmq -z=matlab.',randomstring,' &'];
                     if ~exist('omcpath', 'var')
-                        cmd =['/opt/openmodelica/bin/omc --interactive=zmq -z=matlab.',randomstring,' &'];
+                        cmd =['/opt/openmodelica/bin/omc --interactive=zmq -z=matlab.',randomstring, ' >log.txt', ' &'];
                     else
-                        cmd =[omcpath, ' --interactive=zmq -z=matlab.',randomstring,' &'];
+                        cmd =[omcpath, ' --interactive=zmq -z=matlab.',randomstring, ' >log.txt', ' &'];
                     end
                 else
                     %cmd =['omc --interactive=zmq -z=matlab.',randomstring,' &'];
                     if ~exist('omcpath', 'var')
-                        cmd =['omc --interactive=zmq -z=matlab.',randomstring,' &'];
+                        cmd =['omc --interactive=zmq -z=matlab.',randomstring, ' >log.txt', ' &'];
                     else
-                        cmd =[omcpath, ' --interactive=zmq -z=matlab.',randomstring,' &'];
+                        cmd =[omcpath, ' --interactive=zmq -z=matlab.',randomstring, ' >log.txt', ' &'];
                     end
                 end
                 portfile = strcat('openmodelica.',getenv('USER'),'.port.matlab.',randomstring);
