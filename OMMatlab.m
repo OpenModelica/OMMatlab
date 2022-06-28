@@ -60,49 +60,43 @@ classdef OMMatlab < handle
         function obj = OMMatlab(omcpath)
             %randomstring = char(97 + floor(26 .* rand(10,1)))';
             [~,randomstring]=fileparts(tempname);
-            startInfo = System.Diagnostics.ProcessStartInfo();
-            startInfo.Arguments=['--interactive=zmq +z=matlab.',randomstring];
-            startInfo.UseShellExecute=false;
-            startInfo.CreateNoWindow=true;
             if ispc
                 if ~exist('omcpath', 'var')
                     omhome = getenv('OPENMODELICAHOME');
                     omhomepath = replace(fullfile(omhome,'bin','omc.exe'),'\','/');
                     %add omhome to path environment variabel
                     %path1 = getenv('PATH');
-                    %path1 = [path1 omhome];
+                    %path1 = [path1, ';', fullfile(omhome,'bin')];
+                    %disp(path1)
                     %setenv('PATH', path1);
                     %cmd ="START /b "+omhomepath +" --interactive=zmq +z=matlab."+randomstring;
-                    %cmd = ['START /b',' ',omhomepath,' --interactive=zmq +z=matlab.',randomstring];
-                    startInfo.FileName=omhomepath;
-                    startInfo.Environment.Add('OPENMODELICAHOME',omhome);
+                    cmd = ['START /b',' ',omhomepath,' --interactive=zmq -z=matlab.',randomstring];
                 else
                     [dirname1,~]=fileparts(fileparts(omcpath));
-                    startInfo.FileName=omcpath;
-                    startInfo.Environment.Add('OPENMODELICAHOME',dirname1);
+                    %disp(dirname1)
+                    cmd = ['START /b',' ',omcpath,' --interactive=zmq -z=matlab.',randomstring];
                 end
                 portfile = strcat('openmodelica.port.matlab.',randomstring);
             else
                 if ismac && system("which omc") ~= 0
                     %cmd =['/opt/openmodelica/bin/omc --interactive=zmq -z=matlab.',randomstring,' &'];
                     if ~exist('omcpath', 'var')
-                        startInfo.FileName='/opt/openmodelica/bin/omc';
+                        cmd =['/opt/openmodelica/bin/omc --interactive=zmq -z=matlab.',randomstring,' &'];
                     else
-                        startInfo.FileName=omcpath;
+                        cmd =[omcpath, ' --interactive=zmq -z=matlab.',randomstring,' &'];
                     end
                 else
                     %cmd =['omc --interactive=zmq -z=matlab.',randomstring,' &'];
                     if ~exist('omcpath', 'var')
-                        startInfo.FileName='omc';
+                        cmd =['omc --interactive=zmq -z=matlab.',randomstring,' &'];
                     else
-                        startInfo.FileName=omcpath;
+                        cmd =[omcpath, ' --interactive=zmq -z=matlab.',randomstring,' &'];
                     end
                 end
                 portfile = strcat('openmodelica.',getenv('USER'),'.port.matlab.',randomstring);
             end
-            %system(cmd);
-            obj.process = System.Diagnostics.Process.Start(startInfo);
-            %disp(obj.process.Id)
+            %disp(cmd)
+            system(cmd);
             %pause(0.2);
             obj.portfile = replace(fullfile(tempdir,portfile),'\','/');
             while true
@@ -122,16 +116,17 @@ classdef OMMatlab < handle
         
         
         function reply = sendExpression(obj,expr)
-            if(~obj.process.HasExited)
+            %%TODO check for omc process is running or not in a generic way
+            %if(~obj.process.HasExited)
                 obj.requester.send(expr,0);
                 data=obj.requester.recvStr(0);
                 % Parse java string object and return in appropriate matlab
                 % structure if possible, otherwise return as normal strings
                 reply=parseExpression(obj,string(data));
-            else
-                disp("Process Exited, No connection with OMC. Create a new instance of OMMatlab session");
-                return
-            end
+            %else
+                %disp("Process Exited, No connection with OMC. Create a new instance of OMMatlab session");
+                %return
+            %end
         end
         
         function ModelicaSystem(obj,filename,modelname,libraries,commandLineOptions)
@@ -993,10 +988,8 @@ classdef OMMatlab < handle
         
         function delete(obj)
             %disp("inside delete")
-            delete(obj.portfile);
+            obj.sendExpression("quit()")
             obj.requester.close();
-            % kill the spwaned process for omc
-            obj.process.Kill()
             delete(obj);
         end
     end
