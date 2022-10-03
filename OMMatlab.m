@@ -480,7 +480,12 @@ classdef OMMatlab < handle
         
         % check for parameter modifiable or not
         function result = isParameterChangeable(obj, name, value)
-            q = getQuantities(obj, name);
+            if (isfield(obj.mappednames, char(name)))
+                tmpname = obj.mappednames.(name);
+            else
+                tmpname = name;
+            end
+            q = getQuantities(obj, string(tmpname));
             if q.changeable{1} == "false"
                 disp("| info |  setParameters() failed : It is not possible to set the following signal " + """" + name + """" + ", It seems to be structural, final, protected or evaluated or has a non-constant binding, use sendExpression(setParameterValue("+ obj.modelname + ", " + name + ", " + value + "), parsed=false)" + " and rebuild the model using buildModel() API")
                 result = false;
