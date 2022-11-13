@@ -1,7 +1,7 @@
 % This file is part of OpenModelica.
 % Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
-% c/o Linköpings universitet, Department of Computer and Information Science,
-% SE-58183 Linköping, Sweden.
+% c/o LinkÃ¶pings universitet, Department of Computer and Information Science,
+% SE-58183 LinkÃ¶ping, Sweden.
 %
 % All rights reserved.
 %
@@ -836,13 +836,21 @@ classdef OMMatlab < handle
             if(~isempty(fieldnames(matrix_name)))
                 fields=fieldnames(matrix_name);
                 t=fields{end};
-                rows=str2double(t(3));
-                columns=str2double(t(5));
+                
+                rows_char=extractBetween(t,string(t(1:2)),"_");
+                rows=str2double(rows_char);
+                columns_char=extractBetween(t,string(rows_char)+"_","_");
+                columns=str2double(columns_char);
+              
                 tmpMatrix=zeros(rows,columns,'double');
                 for i=1:length(fields)
                     n=fields{i};
-                    r=str2double(n(3));
-                    c=str2double(n(5));
+                    
+                    r_char=extractBetween(n,string(n(1:2)),"_");
+                    r=str2double(r_char);
+                    c_char=extractBetween(n,string(r_char)+"_","_");
+                    c=str2double(c_char);
+                    
                     val=str2double(matrix_name.(fields{i}));
                     format shortG
                     tmpMatrix(r,c)=val;
