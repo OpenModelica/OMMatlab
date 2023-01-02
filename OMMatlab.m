@@ -938,7 +938,7 @@ classdef OMMatlab < handle
         
         function result = parseExpression(obj,args)
             %final=regexp(args,'(?<=")[^"]+(?=")|[{}(),]|[a-zA-Z0-9.]+','match');
-            final=regexp(args,'"(.*?)"|[{}()=]|[-a-zA-Z0-9_.]+','match');
+             final=regexp(args,'"(.*?)"|[{}()=]|[-+a-zA-Z0-9_.]+','match');
             %final=regexp(args,'"([^"]|\n)*"|[{}()=]|[a-zA-Z0-9.]+','match');
             if(length(final)>1)
                 if(final(1)=="{" && final(2)~="{")
