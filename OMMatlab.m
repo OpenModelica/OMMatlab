@@ -53,6 +53,9 @@ classdef OMMatlab < handle
         linearinputs
         linearoutputs
         linearstates
+        linearStateIndex
+        linearInputIndex
+        linearOutputIndex
         linearquantitylist
         %fileid
     end
@@ -113,8 +116,8 @@ classdef OMMatlab < handle
             %obj.fileid=fileread(obj.portfile);
             obj.requester.connect(filedata);
         end
-        
-        
+
+
         function reply = sendExpression(obj,expr)
             %%TODO check for omc process is running or not in a generic way
             %if(~obj.process.HasExited)
@@ -128,19 +131,19 @@ classdef OMMatlab < handle
                 %return
             %end
         end
-        
+
         function ModelicaSystem(obj,filename,modelname,libraries,commandLineOptions)
             if (nargin < 2)
                 error('Not enough arguments, filename and classname is required');
             end
-            
+
             if ~exist(filename, 'file')
                 msg=filename +" does not exist";
                 error(msg);
                 return;
             end
-            
-            % check for commandLineOptions 
+
+            % check for commandLineOptions
             if exist('commandLineOptions', 'var')
                 exp=join(["setCommandLineOptions(","""",commandLineOptions,"""",")"]);
                 cmdExp=obj.sendExpression(exp);
@@ -149,7 +152,7 @@ classdef OMMatlab < handle
                     return;
                 end
             end
-            
+
             filepath = replace(filename,'\','/');
             %disp(filepath);
             loadfilemsg=obj.sendExpression("loadFile( """+ filepath +""")");
@@ -157,7 +160,7 @@ classdef OMMatlab < handle
                 disp(obj.sendExpression("getErrorString()"));
                 return;
             end
-            
+
             % check for libraries
             if exist('libraries', 'var')
                 %disp("library given");
@@ -186,18 +189,18 @@ classdef OMMatlab < handle
                     return;
                 end
             end
-            
+
             obj.filename = filename;
             obj.modelname = modelname;
             %tmpdirname = char(97 + floor(26 .* rand(15,1)))';
-            
+
             obj.mattempdir = replace(tempname,'\','/');
             %disp("tempdir" + obj.mattempdir)
             mkdir(obj.mattempdir);
             obj.sendExpression("cd("""+ obj.mattempdir +""")")
             buildModel(obj)
         end
-        
+
         function loadLibraryHelper(obj, libname, version)
             if(isfile(libname))
                 libmsg = obj.sendExpression("loadFile( """+ libname +""")");
@@ -219,7 +222,7 @@ classdef OMMatlab < handle
                 end
             end
         end
-        
+
         function buildModel(obj)
             buildModelResult=obj.sendExpression("buildModel("+ obj.modelname +")");
             %r2=split(erase(string(buildModelResult),["{","}",""""]),",");
@@ -233,12 +236,12 @@ classdef OMMatlab < handle
             obj.xmlfile = replace(xmlpath,'\','/');
             xmlparse(obj);
         end
-        
+
         function workdir = getWorkDirectory(obj)
             workdir = obj.mattempdir;
             return;
         end
-        
+
         function xmlparse(obj)
             if isfile(obj.xmlfile)
                 xDoc=xmlread(obj.xmlfile);
@@ -249,7 +252,7 @@ classdef OMMatlab < handle
                 obj.simulationoptions.('stepSize') = char(allexperimentitems.item(0).getAttribute('stepSize'));
                 obj.simulationoptions.('tolerance') = char(allexperimentitems.item(0).getAttribute('tolerance'));
                 obj.simulationoptions.('solver') = char(allexperimentitems.item(0).getAttribute('solver'));
-                
+
                 % ScalarVariables %
                 allvaritem = xDoc.getElementsByTagName('ScalarVariable');
                 for k = 0:allvaritem.getLength-1
@@ -260,7 +263,8 @@ classdef OMMatlab < handle
                     scalar.('variability')=char(allvaritem.item(k).getAttribute('variability'));
                     scalar.('causality') =char(allvaritem.item(k).getAttribute('causality'));
                     scalar.('alias')=char(allvaritem.item(k).getAttribute('alias'));
-                    scalar.('aliasVariable')=char(allvaritem.item(k).getAttribute('aliasVariable'));                    
+                    scalar.('aliasVariable')=char(allvaritem.item(k).getAttribute('aliasVariable'));
+                    scalar.('aliasVariableId')=char(allvaritem.item(k).getAttribute('aliasVariableId'));
 
                     % iterate subchild to find start values of all types
                     childNode = getFirstChild(allvaritem.item(k));
@@ -276,7 +280,7 @@ classdef OMMatlab < handle
                         end
                         childNode = getNextSibling(childNode);
                     end
-                    
+
                     % check for variability parameter and add to parameter list
                     if(obj.linearFlag==false)
                         name=scalar.('name');
@@ -300,7 +304,7 @@ classdef OMMatlab < handle
                                 createvalidnames(obj,name,value,"continuous");
                             end
                         end
-                        
+
                         % check for causality input and add to input list
                         if(strcmp(scalar.('causality'),'input'))
                             try
@@ -323,12 +327,15 @@ classdef OMMatlab < handle
                             name=scalar.('name');
                             if (name(2) == 'x')
                                 obj.linearstates=[obj.linearstates,name(4:end-1)];
+                                obj.linearStateIndex=[obj.linearStateIndex, str2double(char(scalar.('aliasVariableId')))];
                             end
                             if (name(2) == 'u')
                                 obj.linearinputs=[obj.linearinputs,name(4:end-1)];
+                                obj.linearInputIndex=[obj.linearInputIndex, str2double(char(scalar.('aliasVariableId')))];
                             end
                             if (name(2) == 'y')
                                 obj.linearoutputs=[obj.linearoutputs,name(4:end-1)];
+                                obj.linearOutputIndex=[obj.linearOutputIndex, str2double(char(scalar.('aliasVariableId')))];
                             end
                         end
                         obj.linearquantitylist=[obj.linearquantitylist,scalar];
@@ -342,7 +349,7 @@ classdef OMMatlab < handle
                 return;
             end
         end
-        
+
         function result= getQuantities(obj,args)
             if isempty(obj.quantitieslist)
                 result = [];
@@ -363,7 +370,7 @@ classdef OMMatlab < handle
             end
             return;
         end
-        
+
         function result= getLinearQuantities(obj,args)
             if exist('args', 'var')
                 tmpresult=[];
@@ -380,7 +387,7 @@ classdef OMMatlab < handle
             end
             return;
         end
-        
+
         function result = getParameters(obj,args)
             if exist('args', 'var')
                 param=strings(1,length(args));
@@ -393,7 +400,7 @@ classdef OMMatlab < handle
             end
             return;
         end
-        
+
         function result = getInputs(obj,args)
             if exist('args', 'var')
                 inputs=strings(1,length(args));
@@ -406,7 +413,7 @@ classdef OMMatlab < handle
             end
             return;
         end
-        
+
         function result = getOutputs(obj,args)
             if exist('args', 'var')
                 outputs=strings(1,length(args));
@@ -419,7 +426,7 @@ classdef OMMatlab < handle
             end
             return;
         end
-        
+
         function result = getContinuous(obj,args)
             if exist('args', 'var')
                 continuous=strings(1,length(args));
@@ -432,7 +439,7 @@ classdef OMMatlab < handle
             end
             return;
         end
-        
+
         function result = getSimulationOptions(obj,args)
             if exist('args', 'var')
                 simoptions=strings(1,length(args));
@@ -445,7 +452,7 @@ classdef OMMatlab < handle
             end
             return;
         end
-        
+
         function result = getLinearizationOptions(obj,args)
             if exist('args', 'var')
                 linoptions=strings(1,length(args));
@@ -458,7 +465,7 @@ classdef OMMatlab < handle
             end
             return;
         end
-        
+
         % Set Methods
         function setParameters(obj,args)
             if exist('args', 'var')
@@ -477,7 +484,7 @@ classdef OMMatlab < handle
                 end
             end
         end
-        
+
         % check for parameter modifiable or not
         function result = isParameterChangeable(obj, name, value)
             if (isfield(obj.mappednames, char(name)))
@@ -494,7 +501,7 @@ classdef OMMatlab < handle
             result = true;
             return;
         end
-        
+
         function setSimulationOptions(obj,args)
             if exist('args', 'var')
                 for n=1:length(args)
@@ -511,7 +518,7 @@ classdef OMMatlab < handle
                 end
             end
         end
-        
+
         function setLinearizationOptions(obj,args)
             if exist('args', 'var')
                 for n=1:length(args)
@@ -527,7 +534,7 @@ classdef OMMatlab < handle
                 end
             end
         end
-        
+
         function setInputs(obj,args)
             if exist('args', 'var')
                 for n=1:length(args)
@@ -543,7 +550,7 @@ classdef OMMatlab < handle
                 end
             end
         end
-        
+
         function createcsvData(obj)
             obj.csvfile = replace(fullfile(obj.mattempdir,[char(obj.modelname),'.csv']),'\','/');
             fileID = fopen(obj.csvfile,"w");
@@ -632,7 +639,7 @@ classdef OMMatlab < handle
             end
             fclose(fileID);
         end
-        
+
         function simulate(obj,resultfile,simflags)
             if exist('resultfile', 'var')
                 %disp(resultfile);
@@ -678,14 +685,14 @@ classdef OMMatlab < handle
                     else
                         overridevar='';
                     end
-                    
+
                     if(obj.inputflag==true)
                         obj.createcsvData()
                         csvinput=join([' -csvInput=',obj.csvfile]);
                     else
                         csvinput='';
                     end
-                    
+
                     finalsimulationexe = [getexefile,overridevar,csvinput,r,simflags];
                     %disp(finalsimulationexe);
                     if ispc
@@ -694,7 +701,7 @@ classdef OMMatlab < handle
                         dllpath = [replace(fullfile(omhome,'bin'),'\','/'),';',replace(fullfile(omhome,'lib/omc'),'\','/'),';',replace(fullfile(omhome,'lib/omc/cpp'),'\','/'),';',replace(fullfile(omhome,'lib/omc/omsicpp'),'\','/'),';',getenv('PATH')];
                         %disp(dllpath);
                         system(['set PATH=' dllpath ' && ' finalsimulationexe])
-                    else               
+                    else
                         system(finalsimulationexe);
                     end
                     %obj.resultfile=replace(fullfile(obj.mattempdir,[char(obj.modelname),'_res.mat']),'\','/');
@@ -706,9 +713,9 @@ classdef OMMatlab < handle
             else
                 disp("Model cannot be Simulated: xmlfile not found")
             end
-            
+
         end
-        
+
         function result = linearize(obj)
             linres=obj.sendExpression("setCommandLineOptions(""+generateSymbolicLinearization"")");
             %disp(linres);
@@ -718,7 +725,7 @@ classdef OMMatlab < handle
                 return;
             end
             %linearize(SeborgCSTR.ModSeborgCSTRorg,startTime=0.0,stopTime=1.0,numberOfIntervals=500,stepSize=0.002,tolerance=1e-6,simflags="-csvInput=C:/Users/arupa54/AppData/Local/Temp/jl_59DA.tmp/SeborgCSTR.ModSeborgCSTRorg.csv -override=a=2.0")
-            
+
             fields=fieldnames(obj.overridevariables);
             tmpoverride1=strings(1,length(fields));
             for i=1:length(fields)
@@ -729,14 +736,14 @@ classdef OMMatlab < handle
             else
                 tmpoverride2="";
             end
-            
+
             linfields=fieldnames(obj.linearOptions);
             tmpoverride1lin=strings(1,length(linfields));
             for i=1:length(linfields)
                 tmpoverride1lin(i)=linfields(i)+"="+obj.linearOptions.(linfields{i});
             end
             overridelinear=char(strjoin(tmpoverride1lin,','));
-            
+
             if(obj.inputflag==true)
                 obj.createcsvData()
                 csvinput=join(['-csvInput=',obj.csvfile]);
@@ -750,14 +757,14 @@ classdef OMMatlab < handle
 
             obj.linearmodelname=strcat('linearized_model');
             obj.linearfile=replace(fullfile(obj.mattempdir,[char(obj.linearmodelname),'.mo']),'\','/');
-           
-            % support older openmodelica versions before OpenModelica v1.16.2 
+
+            % support older openmodelica versions before OpenModelica v1.16.2
             % where linearize() generates "linear_modelname.mo" file
             if(~isfile(obj.linearfile))
                 obj.linearmodelname=strcat('linear_',obj.modelname);
                 obj.linearfile=replace(fullfile(obj.mattempdir,[char(obj.linearmodelname),'.mo']),'\','/');
             end
-            
+
             if(isfile(obj.linearfile))
                 loadmsg=obj.sendExpression("loadFile("""+ obj.linearfile + """)");
                 if(loadmsg=="false")
@@ -768,7 +775,7 @@ classdef OMMatlab < handle
                 buildmodelexpr=join(["buildModel(",cNames(1),")"]);
                 buildModelmsg=obj.sendExpression(buildmodelexpr);
                 %disp(buildModelmsg(:))
-                
+
                 % parse linearized_model_init.xml to get the matrix
                 % [A,B,C,D]
                 if(~isempty(char(buildModelmsg(1))))
@@ -778,6 +785,9 @@ classdef OMMatlab < handle
                     obj.linearinputs=strings(0,0);
                     obj.linearoutputs=strings(0,0);
                     obj.linearstates=strings(0,0);
+                    obj.linearStateIndex=double.empty(0,0);
+                    obj.linearInputIndex=double.empty(0,0);
+                    obj.linearOutputIndex=double.empty(0,0);
                     xmlparse(obj)
                     result=getLinearMatrix(obj);
                 else
@@ -790,13 +800,13 @@ classdef OMMatlab < handle
                 return;
             end
         end
-        
+
         function result = getLinearMatrix(obj)
             matrix_A=struct;
             matrix_B=struct;
             matrix_C=struct;
             matrix_D=struct;
-            
+
             for i=1:length(obj.linearquantitylist)
                 name=obj.linearquantitylist(i).("name");
                 value= obj.linearquantitylist(i).("value");
@@ -831,26 +841,26 @@ classdef OMMatlab < handle
             result=FullLinearMatrix;
             return;
         end
-        
+
         function result = getLinearMatrixValues(~,matrix_name)
             if(~isempty(fieldnames(matrix_name)))
                 fields=fieldnames(matrix_name);
                 t=fields{end};
-                
+
                 rows_char=extractBetween(t,string(t(1:2)),"_");
                 rows=str2double(rows_char);
                 columns_char=extractBetween(t,string(rows_char)+"_","_");
                 columns=str2double(columns_char);
-              
+
                 tmpMatrix=zeros(rows,columns,'double');
                 for i=1:length(fields)
                     n=fields{i};
-                    
+
                     r_char=extractBetween(n,string(n(1:2)),"_");
                     r=str2double(r_char);
                     c_char=extractBetween(n,string(r_char)+"_","_");
                     c=str2double(c_char);
-                    
+
                     val=str2double(matrix_name.(fields{i}));
                     format shortG
                     tmpMatrix(r,c)=val;
@@ -860,34 +870,37 @@ classdef OMMatlab < handle
                 result=zeros(0,0);
             end
         end
-        
+
         function result = getLinearInputs(obj)
             if(obj.linearFlag==true)
-                result=obj.linearinputs;
+                [sortedinput, index] = sort(obj.linearInputIndex);
+                result=obj.linearinputs(index);
             else
                 disp("Model is not Linearized");
             end
             return;
         end
-        
+
         function result = getLinearOutputs(obj)
             if(obj.linearFlag==true)
-                result=obj.linearoutputs;
+                [sortedoutput, index] = sort(obj.linearOutputIndex);
+                result=obj.linearoutputs(index);
             else
                 disp("Model is not Linearized");
             end
             return;
         end
-        
+
         function result = getLinearStates(obj)
             if(obj.linearFlag==true)
-                result=obj.linearstates;
+                [sortedstates, index] = sort(obj.linearStateIndex);
+                result=obj.linearstates(index);
             else
                 disp("Model is not Linearized");
             end
             return;
         end
-        
+
         function result = getSolutions(obj,args,resultfile)
             if exist('resultfile', 'var')
                 resfile = char(resultfile);
@@ -913,7 +926,7 @@ classdef OMMatlab < handle
                 return;
             end
         end
-        
+
         % function which creates valid field name as matlab
         % does not allow der(h) to be a valid name, also map
         % the changed names to mappednames struct, inorder to
@@ -935,7 +948,7 @@ classdef OMMatlab < handle
                 obj.outputlist.(tmpname)= value;
             end
         end
-        
+
         function result = parseExpression(obj,args)
             %final=regexp(args,'(?<=")[^"]+(?=")|[{}(),]|[a-zA-Z0-9.]+','match');
              final=regexp(args,'"(.*?)"|[{}()=]|[-+a-zA-Z0-9_.]+','match');
@@ -998,7 +1011,7 @@ classdef OMMatlab < handle
                 result=replace(args,"""","");
             end
         end
-        
+
         function delete(obj)
             %disp("inside delete")
             obj.sendExpression("quit()")
