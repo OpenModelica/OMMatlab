@@ -726,11 +726,20 @@ classdef OMMatlab < handle
             end
             %linearize(SeborgCSTR.ModSeborgCSTRorg,startTime=0.0,stopTime=1.0,numberOfIntervals=500,stepSize=0.002,tolerance=1e-6,simflags="-csvInput=C:/Users/arupa54/AppData/Local/Temp/jl_59DA.tmp/SeborgCSTR.ModSeborgCSTRorg.csv -override=a=2.0")
 
-            fields=fieldnames(obj.overridevariables);
+            % check for override variables and their associated mapping
+            names = [fieldnames(obj.overridevariables); fieldnames(obj.simoptoverride)];
+            tmpstruct = cell2struct([struct2cell(obj.overridevariables); struct2cell(obj.simoptoverride)], names, 1);
+            fields=fieldnames(tmpstruct);
             tmpoverride1=strings(1,length(fields));
             for i=1:length(fields)
-                tmpoverride1(i)=fields(i)+"="+obj.overridevariables.(fields{i});
+                if (isfield(obj.mappednames,fields(i)))
+                    name=obj.mappednames.(fields{i});
+                else
+                    name=fields(i);
+                end
+                tmpoverride1(i)=name+"="+tmpstruct.(fields{i});
             end
+
             if(~isempty(tmpoverride1))
                 tmpoverride2=[' -override=',char(strjoin(tmpoverride1,','))];
             else
@@ -750,8 +759,9 @@ classdef OMMatlab < handle
             else
                 csvinput="";
             end
-            linexpr=strcat('linearize(',obj.modelname,',',overridelinear,',','simflags=','"',csvinput,'  ',tmpoverride2,'")');
+            linexpr=strcat('linearize(',obj.modelname,',',overridelinear,',','simflags=','"',csvinput,' ',tmpoverride2,'")');
             %res=obj.sendExpression("linearize(" + obj.modelname + ")");
+            %disp(linexpr);
             res=obj.sendExpression(linexpr);
             obj.resultfile=res.("resultFile");
 
