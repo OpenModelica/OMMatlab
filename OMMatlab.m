@@ -673,6 +673,8 @@ classdef OMMatlab < handle
                         tmpstruct = cell2struct([struct2cell(obj.overridevariables); struct2cell(obj.simoptoverride)], names, 1);
                         fields=fieldnames(tmpstruct);
                         tmpoverride1=strings(1,length(fields));
+                        overridefile = replace(fullfile(obj.mattempdir,[char(obj.modelname),'_override.txt']),'\','/');
+                        fileID = fopen(overridefile,"w");
                         for i=1:length(fields)
                             if (isfield(obj.mappednames,fields(i)))
                                 name=obj.mappednames.(fields{i});
@@ -680,8 +682,12 @@ classdef OMMatlab < handle
                                 name=fields(i);
                             end
                             tmpoverride1(i)=name+"="+tmpstruct.(fields{i});
+                            fprintf(fileID,tmpoverride1(i));
+                            fprintf(fileID,"\n");
                         end
-                        overridevar=[' -override=',char(strjoin(tmpoverride1,','))];
+                        fclose(fileID);
+                        %disp(overridefile)
+                        overridevar=join([' -overrideFile=',overridefile]);
                     else
                         overridevar='';
                     end
@@ -731,6 +737,8 @@ classdef OMMatlab < handle
             tmpstruct = cell2struct([struct2cell(obj.overridevariables); struct2cell(obj.simoptoverride)], names, 1);
             fields=fieldnames(tmpstruct);
             tmpoverride1=strings(1,length(fields));
+            overridelinearfile = replace(fullfile(obj.mattempdir,[char(obj.modelname),'_override_linear.txt']),'\','/');
+            fileID = fopen(overridelinearfile,"w");
             for i=1:length(fields)
                 if (isfield(obj.mappednames,fields(i)))
                     name=obj.mappednames.(fields{i});
@@ -738,10 +746,12 @@ classdef OMMatlab < handle
                     name=fields(i);
                 end
                 tmpoverride1(i)=name+"="+tmpstruct.(fields{i});
+                fprintf(fileID,tmpoverride1(i));
+                fprintf(fileID,"\n");
             end
-
+            fclose(fileID);
             if(~isempty(tmpoverride1))
-                tmpoverride2=[' -override=',char(strjoin(tmpoverride1,','))];
+                tmpoverride2=join([' -overrideFile=',overridelinearfile]);
             else
                 tmpoverride2="";
             end
