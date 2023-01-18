@@ -551,7 +551,7 @@ classdef OMMatlab < handle
             end
         end
 
-        function createcsvData(obj)
+        function createcsvData(obj, startTime, stopTime)
             obj.csvfile = replace(fullfile(obj.mattempdir,[char(obj.modelname),'.csv']),'\','/');
             fileID = fopen(obj.csvfile,"w");
             %disp(strjoin(fieldnames(obj.inputlist),","));
@@ -588,7 +588,7 @@ classdef OMMatlab < handle
             %disp(tmpcsvdata)
             %disp(length(time))
             if(isempty(time))
-                time=[str2double(obj.simulationoptions.('startTime')),str2double(obj.simulationoptions.('stopTime'))];
+                time=[str2double(startTime),str2double(stopTime)];
             end
             t1=struct2cell(tmpcsvdata);
             %disp(length(t1))
@@ -693,7 +693,7 @@ classdef OMMatlab < handle
                     end
 
                     if(obj.inputflag==true)
-                        obj.createcsvData()
+                        obj.createcsvData(obj.simulationoptions.('startTime'), obj.simulationoptions.('stopTime'))
                         csvinput=join([' -csvInput=',obj.csvfile]);
                     else
                         csvinput='';
@@ -733,8 +733,8 @@ classdef OMMatlab < handle
             %linearize(SeborgCSTR.ModSeborgCSTRorg,startTime=0.0,stopTime=1.0,numberOfIntervals=500,stepSize=0.002,tolerance=1e-6,simflags="-csvInput=C:/Users/arupa54/AppData/Local/Temp/jl_59DA.tmp/SeborgCSTR.ModSeborgCSTRorg.csv -override=a=2.0")
 
             % check for override variables and their associated mapping
-            names = [fieldnames(obj.overridevariables); fieldnames(obj.simoptoverride)];
-            tmpstruct = cell2struct([struct2cell(obj.overridevariables); struct2cell(obj.simoptoverride)], names, 1);
+            names = [fieldnames(obj.overridevariables)];
+            tmpstruct = cell2struct([struct2cell(obj.overridevariables)], names, 1);
             fields=fieldnames(tmpstruct);
             tmpoverride1=strings(1,length(fields));
             overridelinearfile = replace(fullfile(obj.mattempdir,[char(obj.modelname),'_override_linear.txt']),'\','/');
@@ -764,7 +764,7 @@ classdef OMMatlab < handle
             overridelinear=char(strjoin(tmpoverride1lin,','));
 
             if(obj.inputflag==true)
-                obj.createcsvData()
+                obj.createcsvData(obj.linearOptions.('startTime'), obj.linearOptions.('stopTime'))
                 csvinput=join(['-csvInput=',obj.csvfile]);
             else
                 csvinput="";
