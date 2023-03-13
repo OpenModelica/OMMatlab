@@ -46,7 +46,7 @@ classdef OMMatlab < handle
         overridevariables=struct
         simoptoverride=struct
         inputflag=false
-        linearOptions=struct('startTime','0.0','stopTime','1.0','numberOfIntervals','500','stepSize','0.002','tolerance','1e-6')
+        linearOptions=struct('startTime','0.0','stopTime','1.0','stepSize','0.002','tolerance','1e-6')
         linearfile
         linearFlag=false
         linearmodelname
@@ -722,7 +722,7 @@ classdef OMMatlab < handle
 
         end
 
-        function result = linearize(obj)
+        function result = linearize(obj, lintime, simflags)
             linres=obj.sendExpression("setCommandLineOptions(""+generateSymbolicLinearization"")");
             %disp(linres);
             %disp(obj.modelname);
@@ -731,10 +731,14 @@ classdef OMMatlab < handle
                 return;
             end
             %linearize(SeborgCSTR.ModSeborgCSTRorg,startTime=0.0,stopTime=1.0,numberOfIntervals=500,stepSize=0.002,tolerance=1e-6,simflags="-csvInput=C:/Users/arupa54/AppData/Local/Temp/jl_59DA.tmp/SeborgCSTR.ModSeborgCSTRorg.csv -override=a=2.0")
-
+            if exist('simflags', 'var')
+                simflags=join([' ',char(simflags)]);
+            else
+                simflags='';
+            end
             % check for override variables and their associated mapping
-            names = [fieldnames(obj.overridevariables)];
-            tmpstruct = cell2struct([struct2cell(obj.overridevariables)], names, 1);
+            names = [fieldnames(obj.overridevariables), fieldnames(obj.linearOptions)];
+            tmpstruct = cell2struct([struct2cell(obj.overridevariables); struct2cell(obj.linearOptions)], names, 1);
             fields=fieldnames(tmpstruct);
             tmpoverride1=strings(1,length(fields));
             overridelinearfile = replace(fullfile(obj.mattempdir,[char(obj.modelname),'_override_linear.txt']),'\','/');
@@ -753,27 +757,47 @@ classdef OMMatlab < handle
             if(~isempty(tmpoverride1))
                 tmpoverride2=join([' -overrideFile=',overridelinearfile]);
             else
-                tmpoverride2="";
+                tmpoverride2='';
             end
-
-            linfields=fieldnames(obj.linearOptions);
-            tmpoverride1lin=strings(1,length(linfields));
-            for i=1:length(linfields)
-                tmpoverride1lin(i)=linfields(i)+"="+obj.linearOptions.(linfields{i});
-            end
-            overridelinear=char(strjoin(tmpoverride1lin,','));
-
+                            
             if(obj.inputflag==true)
                 obj.createcsvData(obj.linearOptions.('startTime'), obj.linearOptions.('stopTime'))
-                csvinput=join(['-csvInput=',obj.csvfile]);
+                csvinput=join([' -csvInput=',obj.csvfile]);
             else
-                csvinput="";
+                csvinput='';
             end
-            linexpr=strcat('linearize(',obj.modelname,',',overridelinear,',','simflags=','"',csvinput,' ',tmpoverride2,'")');
-            %res=obj.sendExpression("linearize(" + obj.modelname + ")");
-            %disp(linexpr);
-            res=obj.sendExpression(linexpr);
-            obj.resultfile=res.("resultFile");
+            
+            if(isfile(obj.xmlfile))
+                if (ispc)
+                    getexefile = replace(fullfile(obj.mattempdir,[char(obj.modelname),'.exe']),'\','/');
+                    %disp(getexefile)
+                else
+                    getexefile = replace(fullfile(obj.mattempdir,char(obj.modelname)),'\','/');
+                end
+            else
+                disp("Linearization cannot be performed as : " + obj.xmlfile + " not found, which means the model is not buid")
+            end 
+            %linexpr=strcat('linearize(',obj.modelname,',',overridelinear,',','simflags=','"',csvinput,' ',tmpoverride2,'")');
+            if exist('lintime', 'var')
+                linruntime=join([getexefile, ' -l=', char(lintime)]);
+            else
+                linruntime=join([getexefile, ' -l=0']);
+            end
+            finallinearizationexe =[linruntime,tmpoverride2,csvinput,simflags];
+            %disp(finallinearizationexe)    
+            
+            curdir=pwd;
+            cd(obj.mattempdir);
+            if ispc
+                omhome = getenv('OPENMODELICAHOME');
+                %set dll path needed for windows simulation
+                dllpath = [replace(fullfile(omhome,'bin'),'\','/'),';',replace(fullfile(omhome,'lib/omc'),'\','/'),';',replace(fullfile(omhome,'lib/omc/cpp'),'\','/'),';',replace(fullfile(omhome,'lib/omc/omsicpp'),'\','/'),';',getenv('PATH')];
+                %disp(dllpath);
+                system(['set PATH=' dllpath ' && ' finallinearizationexe])
+            else
+                system(finallinearizationexe);
+            end
+            %obj.resultfile=res.("resultFile");
 
             obj.linearmodelname=strcat('linearized_model');
             obj.linearfile=replace(fullfile(obj.mattempdir,[char(obj.linearmodelname),'.mo']),'\','/');
@@ -819,6 +843,7 @@ classdef OMMatlab < handle
                 disp(obj.sendExpression("getErrorString()"))
                 return;
             end
+            cd(curdir);
         end
 
         function result = getLinearMatrix(obj)
