@@ -781,7 +781,7 @@ classdef OMMatlab < handle
             if exist('lintime', 'var')
                 linruntime=join([getexefile, ' -l=', char(lintime)]);
             else
-                linruntime=join([getexefile, strcat(' -l=',char(obj.linearOptions.('stopTime')))]);
+                linruntime=join([getexefile, ' -l=', char(obj.linearOptions.('stopTime'))]);
             end
             finallinearizationexe =[linruntime,tmpoverride2,csvinput,simflags];
             %disp(finallinearizationexe)    
