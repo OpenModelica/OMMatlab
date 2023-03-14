@@ -152,7 +152,9 @@ classdef OMMatlab < handle
                     return;
                 end
             end
-
+            % set default command Line Options for linearization
+            obj.sendExpression("setCommandLineOptions(""--linearizationDumpLanguage=matlab"")");
+            obj.sendExpression("setCommandLineOptions(""+generateSymbolicLinearization"")")
             filepath = replace(filename,'\','/');
             %disp(filepath);
             loadfilemsg=obj.sendExpression("loadFile( """+ filepath +""")");
@@ -723,14 +725,14 @@ classdef OMMatlab < handle
         end
 
         function result = linearize(obj, lintime, simflags)
-            linres=obj.sendExpression("setCommandLineOptions(""+generateSymbolicLinearization"")");
-            %disp(linres);
-            %disp(obj.modelname);
-            if(linres=="false")
-                disp("Linearization cannot be performed "+obj.sendExpression("getErrorString()"));
-                return;
-            end
-            %linearize(SeborgCSTR.ModSeborgCSTRorg,startTime=0.0,stopTime=1.0,numberOfIntervals=500,stepSize=0.002,tolerance=1e-6,simflags="-csvInput=C:/Users/arupa54/AppData/Local/Temp/jl_59DA.tmp/SeborgCSTR.ModSeborgCSTRorg.csv -override=a=2.0")
+%             linres=obj.sendExpression("setCommandLineOptions(""+generateSymbolicLinearization"")");
+%             %disp(linres);
+%             %disp(obj.modelname);
+%             if(linres=="false")
+%                 disp("Linearization cannot be performed "+obj.sendExpression("getErrorString()"));
+%                 return;
+%             end
+%             %linearize(SeborgCSTR.ModSeborgCSTRorg,startTime=0.0,stopTime=1.0,numberOfIntervals=500,stepSize=0.002,tolerance=1e-6,simflags="-csvInput=C:/Users/arupa54/AppData/Local/Temp/jl_59DA.tmp/SeborgCSTR.ModSeborgCSTRorg.csv -override=a=2.0")
             if exist('simflags', 'var')
                 simflags=join([' ',char(simflags)]);
             else
@@ -800,44 +802,51 @@ classdef OMMatlab < handle
             %obj.resultfile=res.("resultFile");
 
             obj.linearmodelname=strcat('linearized_model');
-            obj.linearfile=replace(fullfile(obj.mattempdir,[char(obj.linearmodelname),'.mo']),'\','/');
+            obj.linearfile=replace(fullfile(obj.mattempdir,[char(obj.linearmodelname),'.m']),'\','/');
 
             % support older openmodelica versions before OpenModelica v1.16.2
             % where linearize() generates "linear_modelname.mo" file
             if(~isfile(obj.linearfile))
                 obj.linearmodelname=strcat('linear_',obj.modelname);
-                obj.linearfile=replace(fullfile(obj.mattempdir,[char(obj.linearmodelname),'.mo']),'\','/');
+                obj.linearfile=replace(fullfile(obj.mattempdir,[char(obj.linearmodelname),'.m']),'\','/');
             end
 
             if(isfile(obj.linearfile))
-                loadmsg=obj.sendExpression("loadFile("""+ obj.linearfile + """)");
-                if(loadmsg=="false")
-                    disp(obj.sendExpression("getErrorString()"));
-                    return;
-                end
-                cNames =obj.sendExpression("getClassNames()");
-                buildmodelexpr=join(["buildModel(",cNames(1),")"]);
-                buildModelmsg=obj.sendExpression(buildmodelexpr);
-                %disp(buildModelmsg(:))
-
-                % parse linearized_model_init.xml to get the matrix
-                % [A,B,C,D]
-                if(~isempty(char(buildModelmsg(1))))
-                    obj.linearFlag=true;
-                    obj.xmlfile=replace(fullfile(obj.mattempdir,char(buildModelmsg(2))),'\','/');
-                    obj.linearquantitylist=[];
-                    obj.linearinputs=strings(0,0);
-                    obj.linearoutputs=strings(0,0);
-                    obj.linearstates=strings(0,0);
-                    obj.linearStateIndex=double.empty(0,0);
-                    obj.linearInputIndex=double.empty(0,0);
-                    obj.linearOutputIndex=double.empty(0,0);
-                    xmlparse(obj)
-                    result=getLinearMatrix(obj);
-                else
-                    disp("Building linearized Model failed: " + obj.sendExpression("getErrorString()"));
-                    return;
-                end
+                %addpath(obj.getWorkDirectory());
+                [A, B, C, D, stateVars, inputVars, outputVars] = linearized_model();
+                result = {A, B, C, D};
+                obj.linearstates = stateVars;
+                obj.linearinputs = inputVars;
+                obj.linearoutputs = outputVars;
+                obj.linearFlag = true;
+%                 loadmsg=obj.sendExpression("loadFile("""+ obj.linearfile + """)");
+%                 if(loadmsg=="false")
+%                     disp(obj.sendExpression("getErrorString()"));
+%                     return;
+%                 end
+%                 cNames =obj.sendExpression("getClassNames()");
+%                 buildmodelexpr=join(["buildModel(",cNames(1),")"]);
+%                 buildModelmsg=obj.sendExpression(buildmodelexpr);
+%                 %disp(buildModelmsg(:))
+% 
+%                 % parse linearized_model_init.xml to get the matrix
+%                 % [A,B,C,D]
+%                 if(~isempty(char(buildModelmsg(1))))
+%                     obj.linearFlag=true;
+%                     obj.xmlfile=replace(fullfile(obj.mattempdir,char(buildModelmsg(2))),'\','/');
+%                     obj.linearquantitylist=[];
+%                     obj.linearinputs=strings(0,0);
+%                     obj.linearoutputs=strings(0,0);
+%                     obj.linearstates=strings(0,0);
+%                     obj.linearStateIndex=double.empty(0,0);
+%                     obj.linearInputIndex=double.empty(0,0);
+%                     obj.linearOutputIndex=double.empty(0,0);
+%                     xmlparse(obj)
+%                     result=getLinearMatrix(obj);
+%                 else
+%                     disp("Building linearized Model failed: " + obj.sendExpression("getErrorString()"));
+%                     return;
+%                 end
             else
                 disp("Linearization failed: " + obj.linearfile + " not found")
                 disp(obj.sendExpression("getErrorString()"))
@@ -918,8 +927,8 @@ classdef OMMatlab < handle
 
         function result = getLinearInputs(obj)
             if(obj.linearFlag==true)
-                [sortedinput, index] = sort(obj.linearInputIndex);
-                result=obj.linearinputs(index);
+                %[sortedinput, index] = sort(obj.linearInputIndex);
+                result=obj.linearinputs();
             else
                 disp("Model is not Linearized");
             end
@@ -928,8 +937,8 @@ classdef OMMatlab < handle
 
         function result = getLinearOutputs(obj)
             if(obj.linearFlag==true)
-                [sortedoutput, index] = sort(obj.linearOutputIndex);
-                result=obj.linearoutputs(index);
+                %[sortedoutput, index] = sort(obj.linearOutputIndex);
+                result=obj.linearoutputs();
             else
                 disp("Model is not Linearized");
             end
@@ -938,8 +947,8 @@ classdef OMMatlab < handle
 
         function result = getLinearStates(obj)
             if(obj.linearFlag==true)
-                [sortedstates, index] = sort(obj.linearStateIndex);
-                result=obj.linearstates(index);
+                %[sortedstates, index] = sort(obj.linearStateIndex);
+                result=obj.linearstates();
             else
                 disp("Model is not Linearized");
             end
