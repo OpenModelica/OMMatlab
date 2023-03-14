@@ -737,7 +737,7 @@ classdef OMMatlab < handle
                 simflags='';
             end
             % check for override variables and their associated mapping
-            names = [fieldnames(obj.overridevariables), fieldnames(obj.linearOptions)];
+            names = [fieldnames(obj.overridevariables); fieldnames(obj.linearOptions)];
             tmpstruct = cell2struct([struct2cell(obj.overridevariables); struct2cell(obj.linearOptions)], names, 1);
             fields=fieldnames(tmpstruct);
             tmpoverride1=strings(1,length(fields));
