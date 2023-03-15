@@ -812,9 +812,9 @@ classdef OMMatlab < handle
                 % linearized_model.m 
                 [A, B, C, D, stateVars, inputVars, outputVars] = linearized_model();
                 result = {A, B, C, D};
-                obj.linearstates = stateVars;
-                obj.linearinputs = inputVars;
-                obj.linearoutputs = outputVars;
+                obj.linearstates = replace(stateVars,{'(',')'},{'[',']'});
+                obj.linearinputs = replace(inputVars,{'(',')'},{'[',']'});
+                obj.linearoutputs = replace(outputVars,{'(',')'},{'[',']'});
                 obj.linearFlag = true;
             else
                 disp("Linearization failed: " + obj.linearfile + " not found")
