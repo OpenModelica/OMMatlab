@@ -931,15 +931,21 @@ classdef OMMatlab < handle
                 resfile = obj.resultfile;
             end
             if(isfile(resfile))
+                tmp1=obj.sendExpression("readSimulationResultVars(""" + resfile + """)");
+                obj.sendExpression("closeSimulationResultFile()");
                 if exist('args', 'var') && ~isempty(args)
+                    for i=1:length(args)
+                        if (~ismember(args(i), tmp1) && ~strcmp(args(i),"time"))
+                            disp(char(args(i))+ " does not exist in result file " + char(resfile));
+                            return;
+                        end 
+                    end
                     tmp1=strjoin(cellstr(args),',');
                     tmp2=['{',tmp1,'}'];
                     simresult=obj.sendExpression("readSimulationResult(""" + resfile + ""","+tmp2+")");
                     obj.sendExpression("closeSimulationResultFile()");
                     result=simresult;
                 else
-                    tmp1=obj.sendExpression("readSimulationResultVars(""" + resfile + """)");
-                    obj.sendExpression("closeSimulationResultFile()");
                     result = tmp1;
                 end
                 return;
