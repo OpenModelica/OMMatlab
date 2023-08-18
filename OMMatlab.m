@@ -276,9 +276,19 @@ classdef OMMatlab < handle
                         if childNode.getNodeType == childNode.ELEMENT_NODE
                             if childNode.hasAttribute('start')
                                 %disp(name + "=" + char(childNode.getAttribute('start')) + "=" + attr)
-                                scalar.('value') = char(childNode.getAttribute('start'));
+                                scalar.('start') = char(childNode.getAttribute('start'));
                             else
-                                scalar.('value') = 'None';
+                                scalar.('start') = 'None';
+                            end
+                            if childNode.hasAttribute('min')
+                                scalar.('min') = char(childNode.getAttribute('min'));
+                            else
+                                scalar.('min') = 'None';
+                            end
+                            if childNode.hasAttribute('max')
+                                scalar.('max') = char(childNode.getAttribute('max'));
+                            else
+                                scalar.('max') = 'None';
                             end
                             %scalar.('value')=value;
                         end
@@ -288,7 +298,7 @@ classdef OMMatlab < handle
                     % check for variability parameter and add to parameter list
                     if(obj.linearFlag==false)
                         name=scalar.('name');
-                        value=scalar.('value');
+                        value=scalar.('start');
                         if(strcmp(scalar.('variability'),'parameter'))
                             try
                                 if isfield(obj.overridevariables, name)
