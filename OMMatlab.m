@@ -569,7 +569,11 @@ classdef OMMatlab < handle
             obj.csvfile = replace(fullfile(obj.mattempdir,[char(obj.modelname),'.csv']),'\','/');
             fileID = fopen(obj.csvfile,"w");
             %disp(strjoin(fieldnames(obj.inputlist),","));
-            fprintf(fileID,['time,',strjoin(fieldnames(obj.inputlist),","),',end\n']);
+            inputStrings=fieldnames(obj.inputlist);
+            for i = 1:numel(inputStrings)
+                inputStrings_Modified{i,1} = regexprep(inputStrings{i}, '_([^_]*)_', '[$1]');
+            end
+            fprintf(fileID,['time,',strjoin(inputStrings_Modified,","),',end\n']);
             %csvdata = obj.inputlist;
             fields=fieldnames(obj.inputlist);
             %time=strings(1,length(csvdata));
