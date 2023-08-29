@@ -569,9 +569,19 @@ classdef OMMatlab < handle
             obj.csvfile = replace(fullfile(obj.mattempdir,[char(obj.modelname),'.csv']),'\','/');
             fileID = fopen(obj.csvfile,"w");
             %disp(strjoin(fieldnames(obj.inputlist),","));
-            fprintf(fileID,['time,',strjoin(fieldnames(obj.inputlist),","),',end\n']);
-            %csvdata = obj.inputlist;
             fields=fieldnames(obj.inputlist);
+            % check for mapped names incase of array vars
+            fprintf(fileID, "time,");
+            for i=1:length(fields)
+                if (isfield(obj.mappednames, char(fields(i))))
+                    mappedNames = obj.mappednames.(fields{i});
+                else
+                    mappedNames = char(fields(i));
+                end
+                fprintf(fileID, [mappedNames, ',']);
+            end
+            fprintf(fileID, "end\n");
+            %csvdata = obj.inputlist;
             %time=strings(1,length(csvdata));
             time=[];
             count=1;
