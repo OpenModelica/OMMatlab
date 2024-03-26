@@ -57,6 +57,7 @@ classdef OMMatlab < handle
         linearInputIndex
         linearOutputIndex
         linearquantitylist
+        varFilter 
         %fileid
     end
     methods
@@ -132,7 +133,7 @@ classdef OMMatlab < handle
             %end
         end
 
-        function ModelicaSystem(obj,filename,modelname,libraries,commandLineOptions)
+        function ModelicaSystem(obj,filename,modelname,libraries,commandLineOptions,variableFilter,customBuildDirectory)
             if (nargin < 2)
                 error('Not enough arguments, filename and classname is required');
             end
@@ -144,7 +145,7 @@ classdef OMMatlab < handle
             end
 
             % check for commandLineOptions
-            if exist('commandLineOptions', 'var')
+            if exist('commandLineOptions', 'var') && ~isempty(commandLineOptions)
                 exp=join(["setCommandLineOptions(","""",commandLineOptions,"""",")"]);
                 cmdExp=obj.sendExpression(exp);
                 if(cmdExp == "false")
@@ -166,7 +167,7 @@ classdef OMMatlab < handle
             end
 
             % check for libraries
-            if exist('libraries', 'var')
+            if exist('libraries', 'var') && ~isempty(libraries)
                 %disp("library given");
                 if isa(libraries, 'struct')
                     fields=fieldnames(libraries);
@@ -197,10 +198,24 @@ classdef OMMatlab < handle
             obj.filename = filename;
             obj.modelname = modelname;
             %tmpdirname = char(97 + floor(26 .* rand(15,1)))';
+            
+            if exist('variableFilter', 'var') && ~isempty(variableFilter)
+                obj.varFilter = join(["variableFilter=","""", variableFilter, """"]);
+            else
+                obj.varFilter = join(["variableFilter=","""",".*",""""]);
+            end
 
-            obj.mattempdir = replace(tempname,'\','/');
-            %disp("tempdir" + obj.mattempdir)
-            mkdir(obj.mattempdir);
+            
+            if exist('customBuildDirectory', 'var') && ~isempty(customBuildDirectory)
+                if ~isfolder(customBuildDirectory)
+                    error(customBuildDirectory, " does not exist");
+                    return
+                end
+                obj.mattempdir = replace(char(customBuildDirectory),'\','/');
+            else
+                obj.mattempdir = replace(tempname,'\','/');
+                mkdir(obj.mattempdir);                
+            end    
             obj.sendExpression("cd("""+ obj.mattempdir +""")")
             buildModel(obj)
         end
@@ -228,7 +243,9 @@ classdef OMMatlab < handle
         end
 
         function buildModel(obj)
-            buildModelResult=obj.sendExpression("buildModel("+ obj.modelname +")");
+            buildmodelexpr = join(["buildModel(",obj.modelname,", ", replace(obj.varFilter," ",""),")"]);
+            %disp(buildmodelexpr);
+            buildModelResult = obj.sendExpression(buildmodelexpr);
             %r2=split(erase(string(buildModelResult),["{","}",""""]),",");
             %disp(r2);
             if(isempty(char(buildModelResult(1))))
