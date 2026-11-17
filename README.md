@@ -55,4 +55,13 @@ LOG_SUCCESS       | info    | The simulation finished successfully.
     timeTotal = 4.795528603068404
 end SimulationResult;
 ```
+# Several OpenModelica versions
+`OMMatlab()` starts the omc from the `PATH`, or on Windows the OpenModelica that the environment variable `OPENMODELICAHOME` points to. The Windows installer allows several versions to be installed side by side and sets `OPENMODELICAHOME_<version>` for each of them (`OPENMODELICAHOME_1_27_0` for version 1.27.0). Select one of them with the second argument:
+```
+>>> omc=OMMatlab('', '1.27.0');   % exactly this version
+>>> omc=OMMatlab('', '1.27');     % the newest installed 1.27.x
+>>> OMMatlab.installedVersions()  % what is installed, newest first
+```
+The first argument is the path to an omc executable, `OMMatlab('C:/OpenModelica/bin/omc.exe')`.
+
 To see the list of available OpenModelicaScripting API see    (https://www.openmodelica.org/doc/OpenModelicaUsersGuide/latest/scripting_api.html
