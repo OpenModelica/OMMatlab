@@ -94,7 +94,8 @@ classdef OMMatlab < handle
                     % no OPENMODELICAHOME and no OPENMODELICAHOME_<version>: use omc from PATH
                     omcpath = 'omc';
                 end
-                cmd = ['START /b',' ',omcpath,' --interactive=zmq -z=matlab.',randomstring];
+                % quoted: the installation directory can contain spaces (C:\Program Files\...)
+                cmd = ['START "" /b "',omcpath,'" --interactive=zmq -z=matlab.',randomstring];
                 portfile = strcat('openmodelica.port.matlab.',randomstring);
             else
                 if ismac && system("which omc") ~= 0
